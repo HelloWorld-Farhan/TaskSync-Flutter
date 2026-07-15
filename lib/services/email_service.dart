@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class EmailService {
   // Replace this with the actual Google Apps Script Web App URL after deployment
-  static const String _scriptUrl = "https://script.google.com/macros/s/AKfycbz5WfPBqEDFcWk7MGqJUoZFn0-D1OS0I4ijv1KhToJNOIOXwlDM9wlHncA56sWN2RBN/exec";
+  static const String _scriptUrl = "https://script.google.com/macros/s/AKfycbxxDUGyhKEYuaRPP2p7aFzaX96wJMFn_fxuf8IcJQ5NODnyXM-57_ib0SsxEbIuSIjJ/exec";
 
   static Future<void> sendEmailNow({
     required String email,
