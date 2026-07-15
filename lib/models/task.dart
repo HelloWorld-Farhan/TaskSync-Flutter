@@ -4,6 +4,9 @@ class Task {
   String description;
   String date;
   String time;
+  String recipientEmail;
+  String recurrenceType;
+  String customDates;
   int isCompleted;
 
   Task({
@@ -12,6 +15,9 @@ class Task {
     required this.description,
     required this.date,
     required this.time,
+    required this.recipientEmail,
+    this.recurrenceType = 'Once',
+    this.customDates = '',
     this.isCompleted = 0,
   });
 
@@ -22,6 +28,9 @@ class Task {
       'description': description,
       'date': date,
       'time': time,
+      'recipientEmail': recipientEmail,
+      'recurrenceType': recurrenceType,
+      'customDates': customDates,
       'isCompleted': isCompleted,
     };
   }
@@ -33,6 +42,9 @@ class Task {
       description: map['description'],
       date: map['date'],
       time: map['time'],
+      recipientEmail: map['recipientEmail'] ?? '',
+      recurrenceType: map['recurrenceType'] ?? 'Once',
+      customDates: map['customDates'] ?? '',
       isCompleted: map['isCompleted'],
     );
   }

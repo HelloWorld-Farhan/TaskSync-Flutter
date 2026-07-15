@@ -19,7 +19,17 @@ class DatabaseHelper {
     final dbPath = await getApplicationDocumentsDirectory();
     final path = join(dbPath.path, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    await db.execute('DROP TABLE IF EXISTS tasks');
+    await _createDB(db, newVersion);
   }
 
   Future _createDB(Database db, int version) async {
@@ -34,6 +44,9 @@ CREATE TABLE tasks (
   description $textType,
   date $textType,
   time $textType,
+  recipientEmail $textType,
+  recurrenceType $textType,
+  customDates $textType,
   isCompleted $intType
   )
 ''');
@@ -51,6 +64,22 @@ CREATE TABLE tasks (
     final orderBy = 'date ASC, time ASC';
     final result = await db.query('tasks', orderBy: orderBy);
     return result.map((json) => Task.fromMap(json)).toList();
+  }
+
+  Future<Task?> getTask(int id) async {
+    final db = await instance.database;
+    final maps = await db.query(
+      'tasks',
+      columns: ['id', 'title', 'description', 'date', 'time', 'recipientEmail', 'recurrenceType', 'customDates', 'isCompleted'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Task.fromMap(maps.first);
+    } else {
+      return null;
+    }
   }
 
   Future<int> update(Task task) async {

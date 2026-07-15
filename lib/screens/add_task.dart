@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../services/database_helper.dart';
-import '../services/email_service.dart';
+import '../services/alarm_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
   const AddTaskScreen({super.key});
@@ -17,9 +18,42 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _descController = TextEditingController();
   final _dateController = TextEditingController();
   final _timeController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _customDatesController = TextEditingController();
   
   bool _isAm = true;
-  String _userEmail = ""; // In a real app, load this from SharedPreferences
+  String _recurrenceType = 'Once';
+  
+  final _timeFormatter = MaskTextInputFormatter(
+    mask: '##:##', 
+    filter: { "#": RegExp(r'[0-9]') },
+  );
+
+  final _dateFormatter = MaskTextInputFormatter(
+    mask: '####-##-##', 
+    filter: { "#": RegExp(r'[0-9]') },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedEmail();
+  }
+
+  Future<void> _loadSavedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email');
+    if (savedEmail != null) {
+      setState(() {
+        _emailController.text = savedEmail;
+      });
+    }
+  }
+
+  Future<void> _saveEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_email', email);
+  }
 
   @override
   void dispose() {
@@ -27,70 +61,39 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     _descController.dispose();
     _dateController.dispose();
     _timeController.dispose();
+    _emailController.dispose();
+    _customDatesController.dispose();
     super.dispose();
-  }
-
-  void _formatTime(String value) {
-    if (value.length == 1 && int.tryParse(value) != null) {
-      if (int.parse(value) > 0 && int.parse(value) <= 9) {
-        _timeController.text = "0$value:00";
-        _timeController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _timeController.text.length),
-        );
-      }
-    } else if (value.length == 2 && !value.contains(':')) {
-       _timeController.text = "$value:00";
-       _timeController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _timeController.text.length),
-        );
-    }
-  }
-
-  void _formatDate(String value) {
-    // Auto insert slashes for MM/DD/YYYY
-    if (value.length == 2 && !value.contains('/')) {
-      _dateController.text = "$value/";
-      _dateController.selection = TextSelection.fromPosition(
-        TextPosition(offset: _dateController.text.length),
-      );
-    } else if (value.length == 5 && value.split('/').length == 2) {
-      _dateController.text = "$value/";
-      _dateController.selection = TextSelection.fromPosition(
-        TextPosition(offset: _dateController.text.length),
-      );
-    }
   }
 
   Future<void> _saveTask() async {
     if (_formKey.currentState!.validate()) {
+      await _saveEmail(_emailController.text);
+      
       String finalTime = "${_timeController.text} ${_isAm ? 'AM' : 'PM'}";
+      // Convert to 24-hour for the background service parser
+      int hour = int.parse(_timeController.text.split(':')[0]);
+      int minute = int.parse(_timeController.text.split(':')[1]);
+      if (_isAm && hour == 12) hour = 0;
+      if (!_isAm && hour != 12) hour += 12;
+      String time24 = "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
       
       final task = Task(
         title: _titleController.text,
         description: _descController.text,
         date: _dateController.text,
-        time: finalTime,
+        time: time24, // Save as HH:MM 24-hour for easier parsing later
+        recipientEmail: _emailController.text,
+        recurrenceType: _recurrenceType,
+        customDates: _customDatesController.text,
       );
 
-      await DatabaseHelper.instance.create(task);
+      final createdTask = await DatabaseHelper.instance.create(task);
+      await AlarmService.scheduleAlarm(createdTask);
 
-      // Attempt to schedule an email if an email address is provided (mock setup for now)
-      if (_userEmail.isNotEmpty) {
-        try {
-          // Parse MM/DD/YYYY and HH:MM AM/PM to DateTime (simplified for demo)
-          // In production, use intl DateFormat parsing
-          EmailService.scheduleEmail(
-            email: _userEmail,
-            title: task.title,
-            description: task.description,
-            scheduledTime: DateTime.now().add(const Duration(minutes: 5)), // Demo logic
-          );
-        } catch (e) {
-          print("Could not schedule email: $e");
-        }
+      if (mounted) {
+        Navigator.of(context).pop(true);
       }
-
-      Navigator.of(context).pop(true);
     }
   }
 
@@ -114,16 +117,30 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 controller: _titleController,
                 label: 'Task Title',
                 icon: Icons.title,
-                validator: (val) => val!.isEmpty ? 'Enter a title' : null,
+                validator: (val) => val!.isEmpty ? 'This field cannot be empty' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               _buildTextField(
                 controller: _descController,
                 label: 'Description',
                 icon: Icons.description,
                 maxLines: 3,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _emailController,
+                label: 'Recipient Gmail ID',
+                icon: Icons.email,
+                keyboardType: TextInputType.emailAddress,
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'This field cannot be empty';
+                  if (!RegExp(r"^[a-zA-Z0-9.]+@gmail\.com").hasMatch(val)) {
+                    return 'Please enter a valid @gmail.com address';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -133,8 +150,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       label: 'Time (HH:MM)',
                       icon: Icons.access_time,
                       keyboardType: TextInputType.number,
-                      onChanged: _formatTime,
-                      validator: (val) => val!.isEmpty ? 'Enter time' : null,
+                      inputFormatters: [_timeFormatter],
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'This field cannot be empty';
+                        if (val.length != 5) return 'Invalid time format';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -168,15 +189,54 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               _buildTextField(
                 controller: _dateController,
-                label: 'Date (MM/DD/YYYY)',
+                label: 'Date (YYYY-MM-DD)',
                 icon: Icons.calendar_today,
                 keyboardType: TextInputType.number,
-                onChanged: _formatDate,
-                validator: (val) => val!.isEmpty ? 'Enter date' : null,
+                inputFormatters: [_dateFormatter],
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'This field cannot be empty';
+                  if (val.length != 10) return 'Invalid date format';
+                  return null;
+                },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _recurrenceType,
+                dropdownColor: const Color(0xFF231F4C),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Recurrence',
+                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  prefixIcon: const Icon(Icons.repeat, color: Color(0xFF6B48FF)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
+                ),
+                items: ['Once', 'Daily', 'Custom'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
+                  setState(() {
+                    _recurrenceType = newValue!;
+                  });
+                },
+              ),
+              if (_recurrenceType == 'Custom') ...[
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _customDatesController,
+                  label: 'Custom Dates (YYYY-MM-DD, ...)',
+                  icon: Icons.date_range,
+                  validator: (val) => val!.isEmpty ? 'Enter at least one date' : null,
+                ),
+              ],
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
@@ -208,14 +268,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
-    void Function(String)? onChanged,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      onChanged: onChanged,
+      inputFormatters: inputFormatters,
       validator: validator,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
@@ -236,6 +296,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFF6B48FF)),
         ),
+        errorStyle: const TextStyle(color: Colors.redAccent),
       ),
     );
   }

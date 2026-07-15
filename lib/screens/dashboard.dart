@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:async';
 import '../models/task.dart';
 import '../services/database_helper.dart';
 import 'add_task.dart';
@@ -13,11 +14,24 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<Task>> tasksFuture;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshTasks();
+    // Refresh every minute to update status when background email sends
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        _refreshTasks();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   void _refreshTasks() {
@@ -161,20 +175,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6.0),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.5)),
-              const SizedBox(width: 4),
-              Text(
-                task.date,
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.5)),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.date,
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.access_time, size: 14, color: Colors.white.withOpacity(0.5)),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.time,
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Icon(Icons.access_time, size: 14, color: Colors.white.withOpacity(0.5)),
-              const SizedBox(width: 4),
-              Text(
-                task.time,
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    isDone ? Icons.check_circle_outline : Icons.pending_actions,
+                    size: 14,
+                    color: isDone ? const Color(0xFF00C853) : Colors.orangeAccent,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isDone ? "Completed" : "On Process",
+                    style: TextStyle(
+                      color: isDone ? const Color(0xFF00C853) : Colors.orangeAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
