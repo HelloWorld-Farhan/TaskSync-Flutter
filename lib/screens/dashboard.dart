@@ -160,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.top(6.0),
+          padding: const EdgeInsets.only(top: 6.0),
           child: Row(
             children: [
               Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.5)),
