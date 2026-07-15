@@ -33,7 +33,7 @@
 
 ## 📥 How to Download & Run (For Users)
 
-1. Go to the [Releases](https://github.com/HelloWorld-Farhan/Reminder-Flutter-APP/releases) section of this repository.
+1. Go to the [Releases](https://github.com/HelloWorld-Farhan/TaskSync-Flutter/releases) section of this repository.
 2. Download the latest **`app-release.apk`** file.
 3. Install it on your Android device.
 4. Open **TaskSync**, add your daily schedule, and let it handle your reminders!
@@ -46,8 +46,8 @@ Before you begin, ensure you have the **Flutter SDK** installed on your system.
 
 ### Step 1 — Clone the Repository
 ```bash
-git clone https://github.com/HelloWorld-Farhan/Reminder-Flutter-APP.git
-cd Reminder-Flutter-APP
+git clone https://github.com/HelloWorld-Farhan/TaskSync-Flutter.git
+cd TaskSync-Flutter
 ```
 
 ### Step 2 — Fetch Dependencies
