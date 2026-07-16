@@ -408,9 +408,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          onPressed: () => _deleteTask(task.id!),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (task.isCompleted == 0)
+              IconButton(
+                icon: const Icon(Icons.cancel_outlined, color: Colors.orangeAccent),
+                onPressed: () => _confirmCancelTask(task),
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              onPressed: () => _deleteTask(task.id!),
+            ),
+          ],
         ),
       ),
     ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.2, end: 0);
