@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
@@ -6,7 +7,8 @@ import '../services/database_helper.dart';
 import '../services/alarm_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
-  const AddTaskScreen({super.key});
+  final String recurrenceType;
+  const AddTaskScreen({super.key, this.recurrenceType = 'Once'});
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
@@ -22,7 +24,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _customDatesController = TextEditingController();
   
   bool _isAm = true;
-  String _recurrenceType = 'Once';
+  List<String> _savedEmails = [];
   
   final _timeFormatter = MaskTextInputFormatter(
     mask: '##:##', 
@@ -37,22 +39,22 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedEmail();
+    _loadSavedEmails();
   }
 
-  Future<void> _loadSavedEmail() async {
+  Future<void> _loadSavedEmails() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('saved_email');
-    if (savedEmail != null) {
-      setState(() {
-        _emailController.text = savedEmail;
-      });
-    }
+    setState(() {
+      _savedEmails = prefs.getStringList('saved_emails') ?? [];
+    });
   }
 
   Future<void> _saveEmail(String email) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('saved_email', email);
+    if (!_savedEmails.contains(email)) {
+      _savedEmails.insert(0, email);
+      await prefs.setStringList('saved_emails', _savedEmails);
+    }
   }
 
   @override
@@ -71,7 +73,6 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       await _saveEmail(_emailController.text);
       
       String finalTime = "${_timeController.text} ${_isAm ? 'AM' : 'PM'}";
-      // Convert to 24-hour for the background service parser
       int hour = int.parse(_timeController.text.split(':')[0]);
       int minute = int.parse(_timeController.text.split(':')[1]);
       if (_isAm && hour == 12) hour = 0;
@@ -82,9 +83,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         title: _titleController.text,
         description: _descController.text,
         date: _dateController.text,
-        time: time24, // Save as HH:MM 24-hour for easier parsing later
+        time: time24, 
         recipientEmail: _emailController.text,
-        recurrenceType: _recurrenceType,
+        recurrenceType: widget.recurrenceType,
         customDates: _customDatesController.text,
       );
 
@@ -104,7 +105,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('New Reminder'),
+        title: Text('New ${widget.recurrenceType} Reminder'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -117,7 +118,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 controller: _titleController,
                 label: 'Task Title',
                 icon: Icons.title,
-                validator: (val) => val!.isEmpty ? 'This field cannot be empty' : null,
+                validator: (val) => val!.isEmpty ? 'Title cannot be empty' : null,
               ),
               const SizedBox(height: 16),
               _buildTextField(
@@ -125,19 +126,73 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 label: 'Description',
                 icon: Icons.description,
                 maxLines: 3,
+                validator: (val) => val!.isEmpty ? 'Description cannot be empty' : null,
               ),
               const SizedBox(height: 16),
-              _buildTextField(
-                controller: _emailController,
-                label: 'Recipient Gmail ID',
-                icon: Icons.email,
-                keyboardType: TextInputType.emailAddress,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'This field cannot be empty';
-                  if (!RegExp(r"^[a-zA-Z0-9.]+@gmail\.com").hasMatch(val)) {
-                    return 'Please enter a valid @gmail.com address';
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
                   }
-                  return null;
+                  return _savedEmails.where((String email) {
+                    return email.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                  });
+                },
+                onSelected: (String selection) {
+                  _emailController.text = selection;
+                },
+                fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                  // Bind to our controller for saving
+                  if (textEditingController.text != _emailController.text && _emailController.text.isNotEmpty) {
+                    textEditingController.text = _emailController.text;
+                  }
+                  textEditingController.addListener(() {
+                    _emailController.text = textEditingController.text;
+                  });
+                  return _buildTextField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    label: 'Recipient Gmail ID',
+                    icon: Icons.email,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return 'Email cannot be empty';
+                      if (!RegExp(r"^[a-zA-Z0-9.]+@gmail\.com$").hasMatch(val)) {
+                        return 'Please enter a valid @gmail.com address';
+                      }
+                      return null;
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: MediaQuery.of(context).size.width - 48,
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF24243E),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF6B48FF)),
+                        ),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final String option = options.elementAt(index);
+                            return ListTile(
+                              title: Text(option, style: const TextStyle(color: Colors.white)),
+                              leading: const Icon(Icons.history, color: Color(0xFF6B48FF)),
+                              onTap: () => onSelected(option),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 16),
@@ -152,8 +207,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [_timeFormatter],
                       validator: (val) {
-                        if (val == null || val.isEmpty) return 'This field cannot be empty';
-                        if (val.length != 5) return 'Invalid time format';
+                        if (val == null || val.isEmpty) return 'Time cannot be empty';
+                        if (val.length != 5) return 'Format must be HH:MM';
+                        int? h = int.tryParse(val.split(':')[0]);
+                        int? m = int.tryParse(val.split(':')[1]);
+                        if (h == null || m == null) return 'Invalid time';
+                        if (h < 1 || h > 12) return 'Hour must be 01-12';
+                        if (m < 0 || m > 59) return 'Minute must be 00-59';
                         return null;
                       },
                     ),
@@ -197,38 +257,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [_dateFormatter],
                 validator: (val) {
-                  if (val == null || val.isEmpty) return 'This field cannot be empty';
-                  if (val.length != 10) return 'Invalid date format';
+                  if (val == null || val.isEmpty) return 'Date cannot be empty';
+                  if (val.length != 10) return 'Format must be YYYY-MM-DD';
+                  DateTime? parsed = DateTime.tryParse(val);
+                  if (parsed == null) return 'Invalid date';
+                  
+                  // Strict check to ensure calendar exactness (e.g., February 30th)
+                  String y = val.split('-')[0];
+                  String m = val.split('-')[1];
+                  String d = val.split('-')[2];
+                  if (parsed.year != int.parse(y) || 
+                      parsed.month != int.parse(m) || 
+                      parsed.day != int.parse(d)) {
+                    return 'Invalid calendar date';
+                  }
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _recurrenceType,
-                dropdownColor: const Color(0xFF231F4C),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Recurrence',
-                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                  prefixIcon: const Icon(Icons.repeat, color: Color(0xFF6B48FF)),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-                ),
-                items: ['Once', 'Daily', 'Custom'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _recurrenceType = newValue!;
-                  });
-                },
-              ),
-              if (_recurrenceType == 'Custom') ...[
+              if (widget.recurrenceType == 'Custom') ...[
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: _customDatesController,
@@ -264,6 +310,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   Widget _buildTextField({
     required TextEditingController controller,
+    FocusNode? focusNode,
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
@@ -273,6 +320,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       maxLines: maxLines,
       inputFormatters: inputFormatters,

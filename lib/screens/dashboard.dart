@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import '../models/task.dart';
 import '../services/database_helper.dart';
+import '../services/alarm_service.dart';
 import 'add_task.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -47,8 +48,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _deleteTask(int id) async {
+    await AlarmService.cancelAlarm(id);
     await DatabaseHelper.instance.delete(id);
     _refreshTasks();
+  }
+
+  void _showRecurrenceSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF24243E),
+            borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Make Reminder For', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildRecurrenceOption('Once', Icons.looks_one),
+              _buildRecurrenceOption('Daily', Icons.repeat),
+              _buildRecurrenceOption('Custom', Icons.date_range),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecurrenceOption(String title, IconData icon) {
+    return ListTile(
+      leading: Icon(icon, color: const Color(0xFF6B48FF)),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
+      onTap: () async {
+        Navigator.pop(context); // Close bottom sheet
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => AddTaskScreen(recurrenceType: title)),
+        );
+        if (result == true) {
+          _refreshTasks();
+        }
+      },
+    );
+  }
+
+  void _showTaskDetails(Task task) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF24243E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(task.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _detailRow('Description', task.description),
+                _detailRow('Email', task.recipientEmail),
+                _detailRow('Date', task.date),
+                _detailRow('Time', task.time),
+                _detailRow('Recurrence', task.recurrenceType),
+                if (task.recurrenceType == 'Custom') _detailRow('Custom Dates', task.customDates),
+                _detailRow('Status', task.isCompleted == 1 ? 'Completed' : 'On Process'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF6B48FF))),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(value.isNotEmpty ? value : 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        ],
+      ),
+    );
   }
 
   @override
@@ -98,14 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const AddTaskScreen()),
-          );
-          if (result == true) {
-            _refreshTasks();
-          }
-        },
+        onPressed: _showRecurrenceSelector,
         backgroundColor: const Color(0xFF6B48FF),
         child: const Icon(Icons.add, color: Colors.white),
       ).animate().scale(delay: 500.ms, curve: Curves.elasticOut),
@@ -146,6 +231,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        onTap: () => _showTaskDetails(task),
         leading: GestureDetector(
           onTap: () => _toggleTaskStatus(task),
           child: Container(
