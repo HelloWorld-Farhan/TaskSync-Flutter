@@ -173,22 +173,36 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         width: MediaQuery.of(context).size.width - 48,
                         margin: const EdgeInsets.only(top: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF24243E),
+                          color: const Color(0xFF1E1E32), // Match the filled color feeling of textfields
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF6B48FF)),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                         ),
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: options.length,
-                          itemBuilder: (context, index) {
-                            final String option = options.elementAt(index);
-                            return ListTile(
-                              title: Text(option, style: const TextStyle(color: Colors.white)),
-                              leading: const Icon(Icons.history, color: Color(0xFF6B48FF)),
-                              onTap: () => onSelected(option),
-                            );
-                          },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: ListView.separated(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            separatorBuilder: (context, index) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                            itemBuilder: (context, index) {
+                              final String option = options.elementAt(index);
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                title: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                leading: const Icon(Icons.history, color: Color(0xFF6B48FF), size: 20),
+                                tileColor: Colors.transparent,
+                                hoverColor: Colors.white.withOpacity(0.05),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
