@@ -14,7 +14,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late Future<List<Task>> tasksFuture;
+  List<Task> _tasks = [];
+  bool _isLoading = true;
   Timer? _refreshTimer;
 
   @override
@@ -35,10 +36,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  void _refreshTasks() {
-    setState(() {
-      tasksFuture = DatabaseHelper.instance.readAllTasks();
-    });
+  Future<void> _refreshTasks() async {
+    final data = await DatabaseHelper.instance.readAllTasks();
+    if (mounted) {
+      setState(() {
+        _tasks = data;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _toggleTaskStatus(Task task) async {
@@ -165,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _detailRow('Description', task.description, Icons.description),
                 _detailRow('Email', task.recipientEmail, Icons.email),
-                _detailRow('Date', task.date, Icons.calendar_today),
+                _detailRow('Date', _formatDate(task.date), Icons.calendar_today),
                 _detailRow('Time', task.time, Icons.access_time),
                 _detailRow('Recurrence', task.recurrenceType, Icons.repeat),
                 if (task.recurrenceType == 'Custom') _detailRow('Custom Dates', task.customDates, Icons.date_range),
@@ -259,28 +264,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         child: SafeArea(
-          child: FutureBuilder<List<Task>>(
-            future: tasksFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Colors.white));
-              } else if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return _buildEmptyState();
-              }
-
-              final tasks = snapshot.data!;
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: tasks.length,
-                itemBuilder: (context, index) {
-                  final task = tasks[index];
-                  return _buildTaskCard(task, index);
-                },
-              );
-            },
-          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              : _tasks.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = _tasks[index];
+                        return _buildTaskCard(task, index);
+                      },
+                    ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -357,41 +352,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.5)),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.date,
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today, size: 14, color: Colors.white.withOpacity(0.5)),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDate(task.date),
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Icon(Icons.access_time, size: 14, color: Colors.white.withOpacity(0.5)),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.time,
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: Colors.white.withOpacity(0.5)),
+                      const SizedBox(width: 4),
+                      Text(
+                        task.time,
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Icon(
-                    isCancelled ? Icons.cancel : (isDone ? Icons.check_circle_outline : Icons.pending_actions),
-                    size: 14,
-                    color: isCancelled ? Colors.redAccent : (isDone ? const Color(0xFF00C853) : Colors.orangeAccent),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCancelled ? Icons.cancel : (isDone ? Icons.check_circle_outline : Icons.pending_actions),
+                        size: 14,
+                        color: isCancelled ? Colors.redAccent : (isDone ? const Color(0xFF00C853) : Colors.orangeAccent),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isCancelled ? "Cancelled" : (isDone ? "Completed" : "On Process"),
+                        style: TextStyle(
+                          color: isCancelled ? Colors.redAccent : (isDone ? const Color(0xFF00C853) : Colors.orangeAccent),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isCancelled ? "Cancelled" : (isDone ? "Completed" : "On Process"),
-                    style: TextStyle(
-                      color: isCancelled ? Colors.redAccent : (isDone ? const Color(0xFF00C853) : Colors.orangeAccent),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -411,11 +425,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (task.isCompleted == 0)
+            if (task.isCompleted == 0) ...[
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => AddTaskScreen(
+                        recurrenceType: task.recurrenceType,
+                        taskToEdit: task,
+                      ),
+                    ),
+                  );
+                  if (result == true) {
+                    _refreshTasks();
+                  }
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.cancel_outlined, color: Colors.orangeAccent),
                 onPressed: () => _confirmCancelTask(task),
               ),
+            ],
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
               onPressed: () => _deleteTask(task.id!),
@@ -424,5 +455,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.2, end: 0);
+  }
+
+  String _formatDate(String date) {
+    // Database has YYYY-MM-DD, return DD/MM/YYYY
+    if (date.contains('-') && date.split('-')[0].length == 4) {
+      final parts = date.split('-');
+      return '${parts[2]}/${parts[1]}/${parts[0]}';
+    }
+    return date;
   }
 }

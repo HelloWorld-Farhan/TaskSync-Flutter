@@ -8,7 +8,8 @@ import '../services/alarm_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final String recurrenceType;
-  const AddTaskScreen({super.key, this.recurrenceType = 'Once'});
+  final Task? taskToEdit;
+  const AddTaskScreen({super.key, this.recurrenceType = 'Once', this.taskToEdit});
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
@@ -32,7 +33,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   );
 
   final _dateFormatter = MaskTextInputFormatter(
-    mask: '####-##-##', 
+    mask: '##/##/####', 
     filter: { "#": RegExp(r'[0-9]') },
   );
 
@@ -40,6 +41,34 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   void initState() {
     super.initState();
     _loadSavedEmails();
+    if (widget.taskToEdit != null) {
+      _titleController.text = widget.taskToEdit!.title;
+      _descController.text = widget.taskToEdit!.description;
+      _emailController.text = widget.taskToEdit!.recipientEmail;
+      _customDatesController.text = widget.taskToEdit!.customDates;
+      
+      // Date conversion: YYYY-MM-DD (from DB if old) to DD/MM/YYYY
+      // OR if it's already DD/MM/YYYY, just use it.
+      String dateStr = widget.taskToEdit!.date;
+      if (dateStr.contains('-') && dateStr.split('-')[0].length == 4) {
+        // YYYY-MM-DD
+        final parts = dateStr.split('-');
+        _dateController.text = '${parts[2]}/${parts[1]}/${parts[0]}';
+      } else {
+        _dateController.text = dateStr;
+      }
+      
+      // Time conversion: 24h to 12h
+      String timeStr = widget.taskToEdit!.time;
+      if (timeStr.contains(':')) {
+        int h = int.parse(timeStr.split(':')[0]);
+        int m = int.parse(timeStr.split(':')[1]);
+        _isAm = h < 12;
+        if (h == 0) h = 12;
+        if (h > 12) h -= 12;
+        _timeController.text = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      }
+    }
   }
 
   Future<void> _loadSavedEmails() async {
@@ -72,25 +101,50 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     if (_formKey.currentState!.validate()) {
       await _saveEmail(_emailController.text);
       
-      String finalTime = "${_timeController.text} ${_isAm ? 'AM' : 'PM'}";
       int hour = int.parse(_timeController.text.split(':')[0]);
       int minute = int.parse(_timeController.text.split(':')[1]);
       if (_isAm && hour == 12) hour = 0;
       if (!_isAm && hour != 12) hour += 12;
       String time24 = "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
       
+      // Convert DD/MM/YYYY back to YYYY-MM-DD for storage/alarm sorting standard if desired,
+      // but the prompt asked to make it "Date / Month / Year like that". Let's store it as DD/MM/YYYY 
+      // or YYYY-MM-DD. Storing as YYYY-MM-DD makes DB sorting easier.
+      // The user just said "make that this type - Date / Month / Year like that". 
+      // I'll store it as DD/MM/YYYY since it's displayed directly on the card.
+      // Wait, dashboard sorting uses `date ASC, time ASC`. If we store DD/MM/YYYY, sorting will be wrong.
+      // Let's store as YYYY-MM-DD, and display on card as DD/MM/YYYY.
+      // Or change dashboard sorting. It's safer to store YYYY-MM-DD. 
+      // Actually, if we store DD/MM/YYYY, we can format it before displaying.
+      // But wait, the user said "firstly make that this type - Date / Month / Year like that"
+      // Let's just keep the value as DD/MM/YYYY in the DB if they prefer, or format on the fly.
+      // Let's store as DD/MM/YYYY and update sorting query, OR just use YYYY-MM-DD in DB and display DD/MM/YYYY.
+      // I'll save as DD/MM/YYYY in this field. Sorting in sqlite might fail without custom logic, but let's stick to what we show.
+      // Let's just save as YYYY-MM-DD to avoid breaking sorting, and change dashboard display!
+      
+      final parts = _dateController.text.split('/');
+      String dbDate = '${parts[2]}-${parts[1]}-${parts[0]}'; // YYYY-MM-DD
+
       final task = Task(
+        id: widget.taskToEdit?.id,
         title: _titleController.text,
         description: _descController.text,
-        date: _dateController.text,
+        date: dbDate,
         time: time24, 
         recipientEmail: _emailController.text,
-        recurrenceType: widget.recurrenceType,
+        recurrenceType: widget.taskToEdit?.recurrenceType ?? widget.recurrenceType,
         customDates: _customDatesController.text,
+        isCompleted: widget.taskToEdit?.isCompleted ?? 0,
       );
 
-      final createdTask = await DatabaseHelper.instance.create(task);
-      await AlarmService.scheduleAlarm(createdTask);
+      if (widget.taskToEdit != null) {
+        await DatabaseHelper.instance.update(task);
+        await AlarmService.cancelAlarm(task.id!);
+        await AlarmService.scheduleAlarm(task);
+      } else {
+        final createdTask = await DatabaseHelper.instance.create(task);
+        await AlarmService.scheduleAlarm(createdTask);
+      }
 
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -105,7 +159,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text('New ${widget.recurrenceType} Reminder'),
+        title: Text(widget.taskToEdit != null ? 'Edit Reminder' : 'New ${widget.recurrenceType} Reminder'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -228,6 +282,26 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         if (h == null || m == null) return 'Invalid time';
                         if (h < 1 || h > 12) return 'Hour must be 01-12';
                         if (m < 0 || m > 59) return 'Minute must be 00-59';
+                        
+                        // Check if past time
+                        if (_dateController.text.length == 10) {
+                          try {
+                            final parts = _dateController.text.split('/');
+                            int y = int.parse(parts[2]);
+                            int mon = int.parse(parts[1]);
+                            int d = int.parse(parts[0]);
+                            
+                            int hour24 = h;
+                            if (_isAm && hour24 == 12) hour24 = 0;
+                            if (!_isAm && hour24 != 12) hour24 += 12;
+                            
+                            DateTime selected = DateTime(y, mon, d, hour24, m);
+                            if (selected.isBefore(DateTime.now())) {
+                              return 'Time cannot be in the past';
+                            }
+                          } catch (e) {}
+                        }
+                        
                         return null;
                       },
                     ),
@@ -266,25 +340,44 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _dateController,
-                label: 'Date (YYYY-MM-DD)',
+                label: 'Date (DD/MM/YYYY)',
                 icon: Icons.calendar_today,
                 keyboardType: TextInputType.number,
                 inputFormatters: [_dateFormatter],
                 validator: (val) {
                   if (val == null || val.isEmpty) return 'Date cannot be empty';
-                  if (val.length != 10) return 'Format must be YYYY-MM-DD';
-                  DateTime? parsed = DateTime.tryParse(val);
-                  if (parsed == null) return 'Invalid date';
+                  if (val.length != 10) return 'Format must be DD/MM/YYYY';
                   
-                  // Strict check to ensure calendar exactness (e.g., February 30th)
-                  String y = val.split('-')[0];
-                  String m = val.split('-')[1];
-                  String d = val.split('-')[2];
-                  if (parsed.year != int.parse(y) || 
-                      parsed.month != int.parse(m) || 
-                      parsed.day != int.parse(d)) {
-                    return 'Invalid calendar date';
+                  final parts = val.split('/');
+                  if (parts.length != 3) return 'Format must be DD/MM/YYYY';
+                  
+                  int? d = int.tryParse(parts[0]);
+                  int? m = int.tryParse(parts[1]);
+                  int? y = int.tryParse(parts[2]);
+                  
+                  if (d == null || m == null || y == null) return 'Invalid numbers';
+                  
+                  if (m < 1 || m > 12) return 'Month must be 01-12';
+                  
+                  // Days in month logic
+                  int maxDays = 31;
+                  if (m == 4 || m == 6 || m == 9 || m == 11) {
+                    maxDays = 30;
+                  } else if (m == 2) {
+                    bool isLeap = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0));
+                    maxDays = isLeap ? 29 : 28;
                   }
+                  
+                  if (d < 1 || d > maxDays) return 'Day must be 01-$maxDays for this month';
+                  
+                  DateTime parsed = DateTime(y, m, d);
+                  DateTime now = DateTime.now();
+                  DateTime today = DateTime(now.year, now.month, now.day);
+                  
+                  if (parsed.isBefore(today)) {
+                    return 'Date cannot be in the past';
+                  }
+                  
                   return null;
                 },
               ),
@@ -309,9 +402,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    'Save Reminder',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                  child: Text(
+                    widget.taskToEdit != null ? 'Update Reminder' : 'Save Reminder',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
               ),
