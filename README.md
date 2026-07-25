@@ -1,7 +1,7 @@
 # ⏰ TaskSync - The Smart Schedule Reminder
 
 <p align="center">
-  <img src="public/logo_rounded.png" width="120" alt="TaskSync Logo" />
+  <img src="Logo.png" width="250" alt="TaskSync Logo" />
 </p>
 
 <p align="center">

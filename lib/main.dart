@@ -84,10 +84,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.task_alt_rounded,
-                size: 60,
-                color: Colors.white,
+              child: Center(
+                child: Image.asset(
+                  'Logo.png',
+                  width: 80,
+                  height: 80,
+                ),
               ),
             ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack).fadeIn(),
             const SizedBox(height: 24),
