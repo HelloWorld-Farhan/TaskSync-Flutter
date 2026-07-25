@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/database_helper.dart';
 import '../services/alarm_service.dart';
@@ -25,6 +26,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _customDatesController = TextEditingController();
   
   bool _isAm = true;
+  String _dayName = '';
   List<String> _savedEmails = [];
   
   final _timeFormatter = MaskTextInputFormatter(
@@ -41,6 +43,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   void initState() {
     super.initState();
     _loadSavedEmails();
+    _dateController.addListener(_updateDayName);
     if (widget.taskToEdit != null) {
       _titleController.text = widget.taskToEdit!.title;
       _descController.text = widget.taskToEdit!.description;
@@ -76,6 +79,31 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     setState(() {
       _savedEmails = prefs.getStringList('saved_emails') ?? [];
     });
+  }
+
+  void _updateDayName() {
+    String val = _dateController.text;
+    if (val.length == 10) {
+      final parts = val.split('/');
+      if (parts.length == 3) {
+        int? d = int.tryParse(parts[0]);
+        int? m = int.tryParse(parts[1]);
+        int? y = int.tryParse(parts[2]);
+        if (d != null && m != null && y != null) {
+          try {
+            DateTime parsed = DateTime(y, m, d);
+            String day = DateFormat('EEEE').format(parsed);
+            if (_dayName != day) {
+              setState(() { _dayName = day; });
+            }
+            return;
+          } catch (_) {}
+        }
+      }
+    }
+    if (_dayName.isNotEmpty) {
+      setState(() { _dayName = ''; });
+    }
   }
 
   Future<void> _saveEmail(String email) async {
@@ -381,6 +409,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   return null;
                 },
               ),
+              if (_dayName.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event_available, color: Color(0xFF6B48FF), size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'It\'s for $_dayName',
+                        style: const TextStyle(
+                          color: Color(0xFF9D84FF),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               if (widget.recurrenceType == 'Custom') ...[
                 const SizedBox(height: 16),
                 _buildTextField(

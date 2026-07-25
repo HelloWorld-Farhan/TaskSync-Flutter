@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
+import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/database_helper.dart';
 import '../services/alarm_service.dart';
@@ -56,6 +57,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await AlarmService.cancelAlarm(id);
     await DatabaseHelper.instance.delete(id);
     _refreshTasks();
+  }
+
+  void _confirmDeleteTask(Task task) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF24243E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Delete Reminder?', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          content: const Text(
+            'Are you sure you want to delete this reminder?\n\nAfter deletion this will not be done and it cannot be recovered.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () {
+                Navigator.pop(context); // Close confirm
+                _deleteTask(task.id!);
+              },
+              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
   
   Future<void> _cancelTask(Task task) async {
@@ -143,6 +175,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isCancelled = task.isCompleted == 2;
     bool isDone = task.isCompleted == 1;
 
+    String dayName = '';
+    if (task.date.contains('-')) {
+      try {
+        DateTime parsed = DateTime.parse(task.date);
+        dayName = DateFormat('EEEE').format(parsed);
+      } catch (_) {}
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -171,6 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _detailRow('Description', task.description, Icons.description),
                 _detailRow('Email', task.recipientEmail, Icons.email),
                 _detailRow('Date', _formatDate(task.date), Icons.calendar_today),
+                _detailRow('Day', dayName.isNotEmpty ? 'For $dayName' : 'Unknown', Icons.event_available),
                 _detailRow('Time', task.time, Icons.access_time),
                 _detailRow('Recurrence', task.recurrenceType, Icons.repeat),
                 if (task.recurrenceType == 'Custom') _detailRow('Custom Dates', task.customDates, Icons.date_range),
@@ -449,7 +490,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              onPressed: () => _deleteTask(task.id!),
+              onPressed: () => _confirmDeleteTask(task),
             ),
           ],
         ),
