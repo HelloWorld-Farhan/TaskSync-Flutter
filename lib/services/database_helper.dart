@@ -21,15 +21,23 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    await db.execute('DROP TABLE IF EXISTS tasks');
-    await _createDB(db, newVersion);
+    if (oldVersion < 3) {
+      await db.execute('''
+CREATE TABLE IF NOT EXISTS pending_emails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL
+  )
+''');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -48,6 +56,15 @@ CREATE TABLE tasks (
   recurrenceType $textType,
   customDates $textType,
   isCompleted $intType
+  )
+''');
+
+    await db.execute('''
+CREATE TABLE pending_emails (
+  id $idType,
+  email $textType,
+  title $textType,
+  description $textType
   )
 ''');
   }
@@ -96,6 +113,31 @@ CREATE TABLE tasks (
     final db = await instance.database;
     return await db.delete(
       'tasks',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- Pending Emails ---
+
+  Future<void> insertPendingEmail(String email, String title, String description) async {
+    final db = await instance.database;
+    await db.insert('pending_emails', {
+      'email': email,
+      'title': title,
+      'description': description,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> readAllPendingEmails() async {
+    final db = await instance.database;
+    return await db.query('pending_emails');
+  }
+
+  Future<void> deletePendingEmail(int id) async {
+    final db = await instance.database;
+    await db.delete(
+      'pending_emails',
       where: 'id = ?',
       whereArgs: [id],
     );

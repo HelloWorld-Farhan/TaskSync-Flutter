@@ -11,12 +11,21 @@ void alarmCallback(int id) async {
   final task = await DatabaseHelper.instance.getTask(id);
   
   if (task != null) {
-    // Send email immediately
-    await EmailService.sendEmailNow(
+    // Send email
+    bool success = await EmailService.sendEmailNow(
       email: task.recipientEmail,
       title: task.title,
       description: task.description,
     );
+
+    if (!success) {
+      await DatabaseHelper.instance.insertPendingEmail(
+        task.recipientEmail,
+        task.title,
+        task.description,
+      );
+      await AlarmService.startRetryTimer();
+    }
 
     // If Daily, schedule next
     if (task.recurrenceType == 'Daily') {
@@ -57,6 +66,35 @@ void alarmCallback(int id) async {
       task.isCompleted = 1;
       await DatabaseHelper.instance.update(task);
     }
+  }
+}
+
+@pragma('vm:entry-point')
+void retryCallback(int id) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final pending = await DatabaseHelper.instance.readAllPendingEmails();
+  
+  if (pending.isEmpty) {
+    await AlarmService.stopRetryTimer();
+    return;
+  }
+
+  bool allSuccess = true;
+  for (var emailData in pending) {
+    bool success = await EmailService.sendEmailNow(
+      email: emailData['email'],
+      title: emailData['title'],
+      description: emailData['description'],
+    );
+    if (success) {
+      await DatabaseHelper.instance.deletePendingEmail(emailData['id']);
+    } else {
+      allSuccess = false;
+    }
+  }
+
+  if (allSuccess) {
+    await AlarmService.stopRetryTimer();
   }
 }
 
@@ -104,5 +142,23 @@ class AlarmService {
   
   static Future<void> cancelAlarm(int id) async {
     await AndroidAlarmManager.cancel(id);
+  }
+
+  static Future<void> startRetryTimer() async {
+    // Schedule a periodic alarm every 1 minute to retry sending emails
+    await AndroidAlarmManager.periodic(
+      const Duration(minutes: 1),
+      99999, // Unique ID for retry timer
+      retryCallback,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
+    print('Started offline retry timer');
+  }
+
+  static Future<void> stopRetryTimer() async {
+    await AndroidAlarmManager.cancel(99999);
+    print('Stopped offline retry timer');
   }
 }

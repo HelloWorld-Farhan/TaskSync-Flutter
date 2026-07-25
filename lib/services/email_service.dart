@@ -5,7 +5,7 @@ class EmailService {
   // Replace this with the actual Google Apps Script Web App URL after deployment
   static const String _scriptUrl = "https://script.google.com/macros/s/AKfycbxxDUGyhKEYuaRPP2p7aFzaX96wJMFn_fxuf8IcJQ5NODnyXM-57_ib0SsxEbIuSIjJ/exec";
 
-  static Future<void> sendEmailNow({
+  static Future<bool> sendEmailNow({
     required String email,
     required String title,
     required String description,
@@ -24,11 +24,14 @@ class EmailService {
 
       if (response.statusCode == 200 || response.statusCode == 302) {
         print("Email successfully sent!");
+        return true;
       } else {
         print("Failed to send email: ${response.body}");
+        return false;
       }
     } catch (e) {
       print("Error sending email: $e");
+      return false;
     }
   }
 }

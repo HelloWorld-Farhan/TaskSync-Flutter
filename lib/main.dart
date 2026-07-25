@@ -4,9 +4,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'screens/dashboard.dart';
 
+import 'services/alarm_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AndroidAlarmManager.initialize();
+  
+  // Attempt to process any pending offline emails on startup
+  retryCallback(0);
+  
   runApp(const TaskSyncApp());
 }
 
