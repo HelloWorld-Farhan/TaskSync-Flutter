@@ -16,6 +16,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   List<Task> _tasks = [];
+  Map<String, List<Task>> _groupedTasks = {};
   bool _isLoading = true;
   Timer? _refreshTimer;
 
@@ -39,9 +40,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _refreshTasks() async {
     final data = await DatabaseHelper.instance.readAllTasks();
+    
+    // Sort tasks by date and time
+    data.sort((a, b) {
+      int dateCmp = a.date.compareTo(b.date);
+      if (dateCmp != 0) return dateCmp;
+      return a.time.compareTo(b.time);
+    });
+
+    Map<String, List<Task>> grouped = {};
+    for (var task in data) {
+      if (!grouped.containsKey(task.date)) {
+        grouped[task.date] = [];
+      }
+      grouped[task.date]!.add(task);
+    }
+    
     if (mounted) {
       setState(() {
         _tasks = data;
+        _groupedTasks = grouped;
         _isLoading = false;
       });
     }
@@ -53,42 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshTasks();
   }
 
-  Future<void> _deleteTask(int id) async {
-    await AlarmService.cancelAlarm(id);
-    await DatabaseHelper.instance.delete(id);
-    _refreshTasks();
-  }
 
-  void _confirmDeleteTask(Task task) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF24243E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Delete Reminder?', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-          content: const Text(
-            'Are you sure you want to delete this reminder?\n\nAfter deletion this will not be done and it cannot be recovered.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              onPressed: () {
-                Navigator.pop(context); // Close confirm
-                _deleteTask(task.id!);
-              },
-              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
   
   Future<void> _cancelTask(Task task) async {
     await AlarmService.cancelAlarm(task.id!);
@@ -311,10 +294,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? _buildEmptyState()
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _tasks.length,
+                      itemCount: _groupedTasks.keys.length,
                       itemBuilder: (context, index) {
-                        final task = _tasks[index];
-                        return _buildTaskCard(task, index);
+                        String dateKey = _groupedTasks.keys.elementAt(index);
+                        List<Task> tasksForDate = _groupedTasks[dateKey]!;
+                        
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDateHeader(dateKey),
+                            ...tasksForDate.asMap().entries.map((entry) {
+                              return _buildTaskCard(entry.value, entry.key);
+                            }),
+                          ],
+                        );
                       },
                     ),
         ),
@@ -341,6 +334,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ).animate().fade().scale(),
     );
+  }
+
+  Widget _buildDateHeader(String dateString) {
+    String displayText = dateString;
+    try {
+      DateTime parsed = DateTime.parse(dateString);
+      DateTime now = DateTime.now();
+      DateTime today = DateTime(now.year, now.month, now.day);
+      DateTime yesterday = today.subtract(const Duration(days: 1));
+      DateTime tomorrow = today.add(const Duration(days: 1));
+      
+      String dayName = DateFormat('EEEE').format(parsed);
+      String formattedDate = DateFormat('dd/MM/yyyy').format(parsed);
+      
+      if (parsed == today) {
+        displayText = 'Today ($dayName)';
+      } else if (parsed == yesterday) {
+        displayText = 'Yesterday ($dayName)';
+      } else if (parsed == tomorrow) {
+        displayText = 'Tomorrow ($dayName)';
+      } else {
+        displayText = '$formattedDate ($dayName)';
+      }
+    } catch (_) {}
+    
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 16, left: 8),
+      child: Text(
+        displayText,
+        style: const TextStyle(
+          color: Color(0xFF9D84FF),
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ).animate().fade().slideX();
   }
 
   Widget _buildTaskCard(Task task, int index) {
@@ -488,10 +517,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () => _confirmCancelTask(task),
               ),
             ],
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              onPressed: () => _confirmDeleteTask(task),
-            ),
           ],
         ),
       ),
