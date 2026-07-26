@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/database_helper.dart';
 import '../services/alarm_service.dart';
+import '../theme/app_theme.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final String recurrenceType;
   final Task? taskToEdit;
-  const AddTaskScreen({super.key, this.recurrenceType = 'Once', this.taskToEdit});
+
+  const AddTaskScreen(
+      {super.key, this.recurrenceType = 'Once', this.taskToEdit});
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
 }
 
-class _AddTaskScreenState extends State<AddTaskScreen> {
+class _AddTaskScreenState extends State<AddTaskScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
@@ -24,44 +29,47 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _timeController = TextEditingController();
   final _emailController = TextEditingController();
   final _customDatesController = TextEditingController();
-  
+
   bool _isAm = true;
+  bool _isSaving = false;
   String _dayName = '';
   List<String> _savedEmails = [];
-  
-  final _timeFormatter = MaskTextInputFormatter(
-    mask: '##:##', 
-    filter: { "#": RegExp(r'[0-9]') },
-  );
 
+  late AnimationController _saveButtonController;
+
+  final _timeFormatter = MaskTextInputFormatter(
+    mask: '##:##',
+    filter: {"#": RegExp(r'[0-9]')},
+  );
   final _dateFormatter = MaskTextInputFormatter(
-    mask: '##/##/####', 
-    filter: { "#": RegExp(r'[0-9]') },
+    mask: '##/##/####',
+    filter: {"#": RegExp(r'[0-9]')},
   );
 
   @override
   void initState() {
     super.initState();
+    _saveButtonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     _loadSavedEmails();
     _dateController.addListener(_updateDayName);
+
     if (widget.taskToEdit != null) {
       _titleController.text = widget.taskToEdit!.title;
       _descController.text = widget.taskToEdit!.description;
       _emailController.text = widget.taskToEdit!.recipientEmail;
       _customDatesController.text = widget.taskToEdit!.customDates;
-      
-      // Date conversion: YYYY-MM-DD (from DB if old) to DD/MM/YYYY
-      // OR if it's already DD/MM/YYYY, just use it.
+
       String dateStr = widget.taskToEdit!.date;
       if (dateStr.contains('-') && dateStr.split('-')[0].length == 4) {
-        // YYYY-MM-DD
         final parts = dateStr.split('-');
         _dateController.text = '${parts[2]}/${parts[1]}/${parts[0]}';
       } else {
         _dateController.text = dateStr;
       }
-      
-      // Time conversion: 24h to 12h
+
       String timeStr = widget.taskToEdit!.time;
       if (timeStr.contains(':')) {
         int h = int.parse(timeStr.split(':')[0]);
@@ -69,7 +77,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         _isAm = h < 12;
         if (h == 0) h = 12;
         if (h > 12) h -= 12;
-        _timeController.text = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+        _timeController.text =
+            '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
       }
     }
   }
@@ -93,17 +102,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           try {
             DateTime parsed = DateTime(y, m, d);
             String day = DateFormat('EEEE').format(parsed);
-            if (_dayName != day) {
-              setState(() { _dayName = day; });
-            }
+            if (_dayName != day) setState(() => _dayName = day);
             return;
           } catch (_) {}
         }
       }
     }
-    if (_dayName.isNotEmpty) {
-      setState(() { _dayName = ''; });
-    }
+    if (_dayName.isNotEmpty) setState(() => _dayName = '');
   }
 
   Future<void> _saveEmail(String email) async {
@@ -116,6 +121,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   @override
   void dispose() {
+    _saveButtonController.dispose();
     _titleController.dispose();
     _descController.dispose();
     _dateController.dispose();
@@ -126,342 +132,550 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Future<void> _saveTask() async {
-    if (_formKey.currentState!.validate()) {
-      await _saveEmail(_emailController.text);
-      
-      int hour = int.parse(_timeController.text.split(':')[0]);
-      int minute = int.parse(_timeController.text.split(':')[1]);
-      if (_isAm && hour == 12) hour = 0;
-      if (!_isAm && hour != 12) hour += 12;
-      String time24 = "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
-      
-      // Convert DD/MM/YYYY back to YYYY-MM-DD for storage/alarm sorting standard if desired,
-      // but the prompt asked to make it "Date / Month / Year like that". Let's store it as DD/MM/YYYY 
-      // or YYYY-MM-DD. Storing as YYYY-MM-DD makes DB sorting easier.
-      // The user just said "make that this type - Date / Month / Year like that". 
-      // I'll store it as DD/MM/YYYY since it's displayed directly on the card.
-      // Wait, dashboard sorting uses `date ASC, time ASC`. If we store DD/MM/YYYY, sorting will be wrong.
-      // Let's store as YYYY-MM-DD, and display on card as DD/MM/YYYY.
-      // Or change dashboard sorting. It's safer to store YYYY-MM-DD. 
-      // Actually, if we store DD/MM/YYYY, we can format it before displaying.
-      // But wait, the user said "firstly make that this type - Date / Month / Year like that"
-      // Let's just keep the value as DD/MM/YYYY in the DB if they prefer, or format on the fly.
-      // Let's store as DD/MM/YYYY and update sorting query, OR just use YYYY-MM-DD in DB and display DD/MM/YYYY.
-      // I'll save as DD/MM/YYYY in this field. Sorting in sqlite might fail without custom logic, but let's stick to what we show.
-      // Let's just save as YYYY-MM-DD to avoid breaking sorting, and change dashboard display!
-      
-      final parts = _dateController.text.split('/');
-      String dbDate = '${parts[2]}-${parts[1]}-${parts[0]}'; // YYYY-MM-DD
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
 
-      final task = Task(
-        id: widget.taskToEdit?.id,
-        title: _titleController.text,
-        description: _descController.text,
-        date: dbDate,
-        time: time24, 
-        recipientEmail: _emailController.text,
-        recurrenceType: widget.taskToEdit?.recurrenceType ?? widget.recurrenceType,
-        customDates: _customDatesController.text,
-        isCompleted: widget.taskToEdit?.isCompleted ?? 0,
-      );
+    await _saveEmail(_emailController.text);
 
-      if (widget.taskToEdit != null) {
-        await DatabaseHelper.instance.update(task);
-        await AlarmService.cancelAlarm(task.id!);
-        await AlarmService.scheduleAlarm(task);
-      } else {
-        final createdTask = await DatabaseHelper.instance.create(task);
-        await AlarmService.scheduleAlarm(createdTask);
-      }
+    int hour = int.parse(_timeController.text.split(':')[0]);
+    int minute = int.parse(_timeController.text.split(':')[1]);
+    if (_isAm && hour == 12) hour = 0;
+    if (!_isAm && hour != 12) hour += 12;
+    String time24 =
+        "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
 
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+    final parts = _dateController.text.split('/');
+    String dbDate = '${parts[2]}-${parts[1]}-${parts[0]}';
+
+    final task = Task(
+      id: widget.taskToEdit?.id,
+      title: _titleController.text,
+      description: _descController.text,
+      date: dbDate,
+      time: time24,
+      recipientEmail: _emailController.text,
+      recurrenceType:
+          widget.taskToEdit?.recurrenceType ?? widget.recurrenceType,
+      customDates: _customDatesController.text,
+      isCompleted: widget.taskToEdit?.isCompleted ?? 0,
+    );
+
+    if (widget.taskToEdit != null) {
+      await DatabaseHelper.instance.update(task);
+      await AlarmService.cancelAlarm(task.id!);
+      await AlarmService.scheduleAlarm(task);
+    } else {
+      final createdTask = await DatabaseHelper.instance.create(task);
+      await AlarmService.scheduleAlarm(createdTask);
+    }
+
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  Color _recurrenceColor() {
+    switch (widget.recurrenceType) {
+      case 'Daily':
+        return AppColors.secondary;
+      case 'Custom':
+        return AppColors.warning;
+      default:
+        return AppColors.primary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final Color accentColor = _recurrenceColor();
+    final bool isEditing = widget.taskToEdit != null;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0C29),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(widget.taskToEdit != null ? 'Edit Reminder' : 'New ${widget.recurrenceType} Reminder'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTextField(
-                controller: _titleController,
-                label: 'Task Title',
-                icon: Icons.title,
-                validator: (val) => val!.isEmpty ? 'Title cannot be empty' : null,
+      backgroundColor: AppColors.bgDeep,
+      body: Stack(
+        children: [
+          // Background gradient arc decoration
+          Positioned(
+            top: -80,
+            left: -80,
+            right: -80,
+            child: Container(
+              height: 280,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accentColor.withValues(alpha: 0.18),
+                    AppColors.bgDeep.withValues(alpha: 0),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(120),
+                  bottomRight: Radius.circular(120),
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descController,
-                label: 'Description',
-                icon: Icons.description,
-                maxLines: 3,
-                validator: (val) => val!.isEmpty ? 'Description cannot be empty' : null,
-              ),
-              const SizedBox(height: 16),
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  if (textEditingValue.text.isEmpty) {
-                    return const Iterable<String>.empty();
-                  }
-                  return _savedEmails.where((String email) {
-                    return email.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                  });
-                },
-                onSelected: (String selection) {
-                  _emailController.text = selection;
-                },
-                fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                  // Bind to our controller for saving
-                  if (textEditingController.text != _emailController.text && _emailController.text.isNotEmpty) {
-                    textEditingController.text = _emailController.text;
-                  }
-                  textEditingController.addListener(() {
-                    _emailController.text = textEditingController.text;
-                  });
-                  return _buildTextField(
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    label: 'Recipient Gmail ID',
-                    icon: Icons.email,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (val) {
-                      if (val == null || val.isEmpty) return 'Email cannot be empty';
-                      if (!RegExp(r"^[a-zA-Z0-9.]+@gmail\.com$").hasMatch(val)) {
-                        return 'Please enter a valid @gmail.com address';
-                      }
-                      return null;
-                    },
-                  );
-                },
-                optionsViewBuilder: (context, onSelected, options) {
-                  return Align(
-                    alignment: Alignment.topLeft,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        width: MediaQuery.of(context).size.width - 48,
-                        margin: const EdgeInsets.only(top: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E32), // Match the filled color feeling of textfields
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                // Custom AppBar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: AppColors.textPrimary, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isEditing ? 'Edit Reminder' : 'New Reminder',
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              widget.recurrenceType,
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ListView.separated(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: options.length,
-                            separatorBuilder: (context, index) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
-                            itemBuilder: (context, index) {
-                              final String option = options.elementAt(index);
-                              return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                                title: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                                leading: const Icon(Icons.history, color: Color(0xFF6B48FF), size: 20),
-                                tileColor: Colors.transparent,
-                                hoverColor: Colors.white.withOpacity(0.05),
-                                onTap: () => onSelected(option),
-                              );
-                            },
-                          ),
-                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildTextField(
-                      controller: _timeController,
-                      label: 'Time (HH:MM)',
-                      icon: Icons.access_time,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [_timeFormatter],
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Time cannot be empty';
-                        if (val.length != 5) return 'Format must be HH:MM';
-                        int? h = int.tryParse(val.split(':')[0]);
-                        int? m = int.tryParse(val.split(':')[1]);
-                        if (h == null || m == null) return 'Invalid time';
-                        if (h < 1 || h > 12) return 'Hour must be 01-12';
-                        if (m < 0 || m > 59) return 'Minute must be 00-59';
-                        
-                        // Check if past time
-                        if (_dateController.text.length == 10) {
-                          try {
-                            final parts = _dateController.text.split('/');
-                            int y = int.parse(parts[2]);
-                            int mon = int.parse(parts[1]);
-                            int d = int.parse(parts[0]);
-                            
-                            int hour24 = h;
-                            if (_isAm && hour24 == 12) hour24 = 0;
-                            if (!_isAm && hour24 != 12) hour24 += 12;
-                            
-                            DateTime selected = DateTime(y, mon, d, hour24, m);
-                            if (selected.isBefore(DateTime.now())) {
-                              return 'Time cannot be in the past';
-                            }
-                          } catch (e) {}
-                        }
-                        
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 1,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isAm = !_isAm;
-                        });
-                      },
-                      child: Container(
-                        height: 56,
+                      // Type badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6B48FF).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF6B48FF)),
+                          color: accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: accentColor.withValues(alpha: 0.3)),
                         ),
-                        child: Center(
-                          child: Text(
-                            _isAm ? 'AM' : 'PM',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF9D84FF),
-                            ),
+                        child: Text(
+                          widget.recurrenceType,
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _dateController,
-                label: 'Date (DD/MM/YYYY)',
-                icon: Icons.calendar_today,
-                keyboardType: TextInputType.number,
-                inputFormatters: [_dateFormatter],
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Date cannot be empty';
-                  if (val.length != 10) return 'Format must be DD/MM/YYYY';
-                  
-                  final parts = val.split('/');
-                  if (parts.length != 3) return 'Format must be DD/MM/YYYY';
-                  
-                  int? d = int.tryParse(parts[0]);
-                  int? m = int.tryParse(parts[1]);
-                  int? y = int.tryParse(parts[2]);
-                  
-                  if (d == null || m == null || y == null) return 'Invalid numbers';
-                  
-                  if (m < 1 || m > 12) return 'Month must be 01-12';
-                  
-                  // Days in month logic
-                  int maxDays = 31;
-                  if (m == 4 || m == 6 || m == 9 || m == 11) {
-                    maxDays = 30;
-                  } else if (m == 2) {
-                    bool isLeap = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0));
-                    maxDays = isLeap ? 29 : 28;
-                  }
-                  
-                  if (d < 1 || d > maxDays) return 'Day must be 01-$maxDays for this month';
-                  
-                  DateTime parsed = DateTime(y, m, d);
-                  DateTime now = DateTime.now();
-                  DateTime today = DateTime(now.year, now.month, now.day);
-                  
-                  if (parsed.isBefore(today)) {
-                    return 'Date cannot be in the past';
-                  }
-                  
-                  return null;
-                },
-              ),
-              if (_dayName.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, left: 12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.event_available, color: Color(0xFF6B48FF), size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'It\'s for $_dayName',
-                        style: const TextStyle(
-                          color: Color(0xFF9D84FF),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
                         ),
                       ),
                     ],
                   ),
-                ),
-              if (widget.recurrenceType == 'Custom') ...[
+                ).animate().fade(duration: 300.ms).slideY(begin: -0.2, end: 0),
+
                 const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _customDatesController,
-                  label: 'Custom Dates (YYYY-MM-DD, ...)',
-                  icon: Icons.date_range,
-                  validator: (val) => val!.isEmpty ? 'Enter at least one date' : null,
-                ),
-              ],
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _saveTask,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6B48FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+
+                // Form
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section: Details
+                          _sectionLabel('Task Details', Icons.info_outline),
+                          const SizedBox(height: 12),
+
+                          _buildField(
+                            controller: _titleController,
+                            label: 'Task Title',
+                            icon: Icons.title_rounded,
+                            delay: 100,
+                            validator: (val) =>
+                                val!.isEmpty ? 'Title cannot be empty' : null,
+                          ),
+                          const SizedBox(height: 14),
+
+                          _buildField(
+                            controller: _descController,
+                            label: 'Description',
+                            icon: Icons.notes_rounded,
+                            maxLines: 3,
+                            delay: 150,
+                            validator: (val) => val!.isEmpty
+                                ? 'Description cannot be empty'
+                                : null,
+                          ),
+                          const SizedBox(height: 22),
+
+                          // Section: Contact
+                          _sectionLabel('Send To', Icons.email_outlined),
+                          const SizedBox(height: 12),
+
+                          _buildEmailField(delay: 200),
+                          const SizedBox(height: 22),
+
+                          // Section: Schedule
+                          _sectionLabel('Schedule', Icons.schedule_rounded),
+                          const SizedBox(height: 12),
+
+                          // Time + AM/PM row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _buildField(
+                                  controller: _timeController,
+                                  label: 'Time (HH:MM)',
+                                  icon: Icons.access_time_rounded,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [_timeFormatter],
+                                  delay: 250,
+                                  validator: (val) {
+                                    if (val == null || val.isEmpty)
+                                      return 'Time required';
+                                    if (val.length != 5) return 'Use HH:MM';
+                                    int? h = int.tryParse(val.split(':')[0]);
+                                    int? m = int.tryParse(val.split(':')[1]);
+                                    if (h == null || m == null)
+                                      return 'Invalid time';
+                                    if (h < 1 || h > 12)
+                                      return 'Hour: 01-12';
+                                    if (m < 0 || m > 59)
+                                      return 'Minute: 00-59';
+                                    if (_dateController.text.length == 10) {
+                                      try {
+                                        final dp =
+                                            _dateController.text.split('/');
+                                        int y = int.parse(dp[2]);
+                                        int mon = int.parse(dp[1]);
+                                        int d = int.parse(dp[0]);
+                                        int h24 = h;
+                                        if (_isAm && h24 == 12) h24 = 0;
+                                        if (!_isAm && h24 != 12) h24 += 12;
+                                        DateTime sel =
+                                            DateTime(y, mon, d, h24, m);
+                                        if (sel.isBefore(DateTime.now()))
+                                          return 'Cannot be in the past';
+                                      } catch (_) {}
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // AM/PM pill toggle
+                              GestureDetector(
+                                onTap: () =>
+                                    setState(() => _isAm = !_isAm),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                  height: 62,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
+                                  decoration: BoxDecoration(
+                                    gradient: _isAm
+                                        ? const LinearGradient(
+                                            colors: [
+                                              Color(0xFFF59E0B),
+                                              Color(0xFFD97706)
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          )
+                                        : const LinearGradient(
+                                            colors: [
+                                              Color(0xFF4F46E5),
+                                              Color(0xFF7C3AED)
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (_isAm
+                                                ? AppColors.warning
+                                                : AppColors.primary)
+                                            .withValues(alpha: 0.4),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _isAm
+                                            ? Icons.wb_sunny_rounded
+                                            : Icons.nights_stay_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _isAm ? 'AM' : 'PM',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ).animate().fade(delay: 250.ms).slideX(begin: 0.1, end: 0),
+
+                          const SizedBox(height: 14),
+
+                          _buildField(
+                            controller: _dateController,
+                            label: 'Date (DD/MM/YYYY)',
+                            icon: Icons.calendar_month_rounded,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [_dateFormatter],
+                            delay: 300,
+                            validator: (val) {
+                              if (val == null || val.isEmpty)
+                                return 'Date required';
+                              if (val.length != 10) return 'Use DD/MM/YYYY';
+                              final parts = val.split('/');
+                              if (parts.length != 3)
+                                return 'Use DD/MM/YYYY';
+                              int? d = int.tryParse(parts[0]);
+                              int? m = int.tryParse(parts[1]);
+                              int? y = int.tryParse(parts[2]);
+                              if (d == null || m == null || y == null)
+                                return 'Invalid numbers';
+                              if (m < 1 || m > 12)
+                                return 'Month: 01-12';
+                              int maxDays = 31;
+                              if (m == 4 || m == 6 || m == 9 || m == 11)
+                                maxDays = 30;
+                              else if (m == 2) {
+                                bool isLeap = (y % 4 == 0 &&
+                                    (y % 100 != 0 || y % 400 == 0));
+                                maxDays = isLeap ? 29 : 28;
+                              }
+                              if (d < 1 || d > maxDays)
+                                return 'Day: 01-$maxDays for this month';
+                              DateTime parsed = DateTime(y, m, d);
+                              DateTime today = DateTime(
+                                  DateTime.now().year,
+                                  DateTime.now().month,
+                                  DateTime.now().day);
+                              if (parsed.isBefore(today))
+                                return 'Date cannot be in the past';
+                              return null;
+                            },
+                          ),
+
+                          // Day name chip
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, anim) =>
+                                FadeTransition(
+                              opacity: anim,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, -0.3),
+                                  end: Offset.zero,
+                                ).animate(anim),
+                                child: child,
+                              ),
+                            ),
+                            child: _dayName.isNotEmpty
+                                ? Padding(
+                                    key: ValueKey(_dayName),
+                                    padding: const EdgeInsets.only(
+                                        top: 10, left: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        gradient: AppColors.primaryGradient,
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primary
+                                                .withValues(alpha: 0.3),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                              Icons.event_available_rounded,
+                                              color: Colors.white,
+                                              size: 14),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'It\'s for $_dayName',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(key: ValueKey('empty')),
+                          ),
+
+                          if (widget.recurrenceType == 'Custom') ...[
+                            const SizedBox(height: 14),
+                            _buildField(
+                              controller: _customDatesController,
+                              label: 'Custom Dates (YYYY-MM-DD, ...)',
+                              icon: Icons.date_range_rounded,
+                              delay: 350,
+                              validator: (val) => val!.isEmpty
+                                  ? 'Enter at least one date'
+                                  : null,
+                            ),
+                          ],
+
+                          const SizedBox(height: 40),
+
+                          // Save button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 58,
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveTask,
+                              style: ElevatedButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                              ),
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  gradient: _isSaving
+                                      ? const LinearGradient(
+                                          colors: [
+                                            Color(0xFF2D3748),
+                                            Color(0xFF2D3748),
+                                          ],
+                                        )
+                                      : AppColors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: _isSaving
+                                      ? []
+                                      : [
+                                          BoxShadow(
+                                            color: AppColors.primary
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                ),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.5,
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              isEditing
+                                                  ? Icons.save_rounded
+                                                  : Icons.add_alarm_rounded,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              isEditing
+                                                  ? 'Update Reminder'
+                                                  : 'Save Reminder',
+                                              style: const TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                          )
+                              .animate()
+                              .fade(delay: 400.ms, duration: 400.ms)
+                              .slideY(
+                                  begin: 0.3,
+                                  end: 0,
+                                  delay: 400.ms,
+                                  duration: 400.ms,
+                                  curve: Curves.easeOut),
+
+                          const SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Text(
-                    widget.taskToEdit != null ? 'Update Reminder' : 'Save Reminder',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTextField({
+  Widget _sectionLabel(String text, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primaryGlow, size: 16),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(height: 1, color: const Color(0xFF2D3748)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildField({
     required TextEditingController controller,
     FocusNode? focusNode,
     required String label,
@@ -470,6 +684,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
+    int delay = 0,
   }) {
     return TextFormField(
       controller: controller,
@@ -478,27 +693,102 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       maxLines: maxLines,
       inputFormatters: inputFormatters,
       validator: validator,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-        prefixIcon: Icon(icon, color: const Color(0xFF6B48FF)),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF6B48FF)),
-        ),
-        errorStyle: const TextStyle(color: Colors.redAccent),
-      ),
+      style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+      decoration: AppTheme.fieldDecoration(label: label, icon: icon),
+    ).animate().fade(delay: delay.ms, duration: 350.ms).slideX(
+        begin: 0.08, end: 0, delay: delay.ms, duration: 350.ms);
+  }
+
+  Widget _buildEmailField({int delay = 0}) {
+    return Autocomplete<String>(
+      optionsBuilder: (TextEditingValue tv) {
+        if (tv.text.isEmpty) return const Iterable<String>.empty();
+        return _savedEmails
+            .where((e) => e.toLowerCase().contains(tv.text.toLowerCase()));
+      },
+      onSelected: (s) => _emailController.text = s,
+      fieldViewBuilder: (context, textEditingController, focusNode, _) {
+        if (textEditingController.text != _emailController.text &&
+            _emailController.text.isNotEmpty) {
+          textEditingController.text = _emailController.text;
+        }
+        textEditingController.addListener(() {
+          _emailController.text = textEditingController.text;
+        });
+        return TextFormField(
+          controller: textEditingController,
+          focusNode: focusNode,
+          keyboardType: TextInputType.emailAddress,
+          style:
+              const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+          decoration: AppTheme.fieldDecoration(
+              label: 'Recipient Gmail', icon: Icons.email_outlined),
+          validator: (val) {
+            if (val == null || val.isEmpty) return 'Email required';
+            if (!RegExp(r"^[a-zA-Z0-9.]+@gmail\.com$").hasMatch(val))
+              return 'Enter a valid @gmail.com address';
+            return null;
+          },
+        ).animate().fade(delay: delay.ms).slideX(begin: 0.08, end: 0, delay: delay.ms);
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery.of(context).size.width - 40,
+              margin: const EdgeInsets.only(top: 6),
+              decoration: BoxDecoration(
+                color: AppColors.bgCardAlt,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF2D3748), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    color: Color(0xFF2D3748),
+                    height: 1,
+                    indent: 20,
+                    endIndent: 20,
+                  ),
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+                    return ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.history_rounded,
+                            color: AppColors.primaryGlow, size: 16),
+                      ),
+                      title: Text(option,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 14)),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
