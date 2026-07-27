@@ -126,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   'Are you sure you want to permanently cancel this reminder?\n\n'
                   '📌 Title: ${task.title}\n'
                   '📅 Date: ${task.date}\n'
-                  '🕐 Time: ${task.time}',
+                  '🕐 Time: ${_formatTime(task.time)}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
@@ -543,6 +543,20 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
     );
+  }
+
+  String _formatTime(String time24) {
+    if (time24.isEmpty) return '';
+    try {
+      final parts = time24.split(':');
+      int h = int.parse(parts[0]);
+      int m = int.parse(parts[1]);
+      bool isAm = h < 12;
+      int h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+      return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} ${isAm ? 'AM' : 'PM'}';
+    } catch (_) {
+      return time24;
+    }
   }
 
   @override
@@ -963,7 +977,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         const SizedBox(width: 10),
                         _infoChip(
                           Icons.access_time_rounded,
-                          task.time,
+                          _formatTime(task.time),
                           AppColors.secondaryGlow,
                         ),
                         const SizedBox(width: 10),

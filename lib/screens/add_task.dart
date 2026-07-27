@@ -30,8 +30,8 @@ class _AddTaskScreenState extends State<AddTaskScreen>
   final _emailController = TextEditingController();
   final _customDatesController = TextEditingController();
 
-  bool _isAm = true;
   bool _isSaving = false;
+  late bool _isAm;
   String _dayName = '';
   List<String> _savedEmails = [];
 
@@ -49,6 +49,7 @@ class _AddTaskScreenState extends State<AddTaskScreen>
   @override
   void initState() {
     super.initState();
+    _isAm = DateTime.now().hour < 12;
     _saveButtonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
