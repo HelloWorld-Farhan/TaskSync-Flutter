@@ -11,6 +11,30 @@ void alarmCallback(int id) async {
   final task = await DatabaseHelper.instance.getTask(id);
   
   if (task != null) {
+    // 1. Check if task is already completed (One-time tasks)
+    if (task.isCompleted == 1) return;
+
+    // 2. Prevent glitch fires (e.g., from app update/reboot rescheduling future/past alarms incorrectly)
+    try {
+      final dateParts = task.date.split('-');
+      final timeParts = task.time.split(':');
+      DateTime scheduledTime = DateTime(
+        int.parse(dateParts[0]),
+        int.parse(dateParts[1]),
+        int.parse(dateParts[2]),
+        int.parse(timeParts[0]),
+        int.parse(timeParts[1]),
+      );
+      
+      // If we are firing more than 5 minutes before the actual target time, it's a glitch
+      if (DateTime.now().isBefore(scheduledTime.subtract(const Duration(minutes: 5)))) {
+        print('Ignoring glitch alarm: fired way too early for $scheduledTime');
+        return; 
+      }
+    } catch (e) {
+      print('Error parsing date/time for glitch check: $e');
+    }
+
     // Send email
     bool success = await EmailService.sendEmailNow(
       email: task.recipientEmail,
