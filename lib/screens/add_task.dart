@@ -578,6 +578,48 @@ class _AddTaskScreenState extends State<AddTaskScreen>
                                 : const SizedBox.shrink(key: ValueKey('empty')),
                           ),
 
+                          // 7-day quick select
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: List.generate(7, (index) {
+                                  DateTime date = DateTime.now().add(Duration(days: index));
+                                  bool isToday = index == 0;
+                                  String dayLabel = isToday ? 'Today' : DateFormat('EEEE').format(date);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 10.0),
+                                    child: InkWell(
+                                      onTap: () {
+                                        _dateController.text = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+                                        _updateDayName();
+                                      },
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.bgCardAlt,
+                                          border: Border.all(color: const Color(0xFF2D3748), width: 1.5),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          dayLabel,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ).animate().fade(delay: 350.ms).slideX(begin: 0.1, end: 0),
+                          ),
+
                           if (widget.recurrenceType == 'Custom') ...[
                             const SizedBox(height: 14),
                             _buildField(
