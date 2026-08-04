@@ -107,6 +107,7 @@ class AppTheme {
     required String label,
     required IconData icon,
     String? hint,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       labelText: label,
@@ -114,6 +115,7 @@ class AppTheme {
       labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
       hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
       prefixIcon: Icon(icon, color: AppColors.primaryGlow, size: 20),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.bgCard,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),

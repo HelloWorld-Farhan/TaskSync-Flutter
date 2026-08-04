@@ -18,7 +18,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   List<Task> _tasks = [];
-  Map<String, List<Task>> _groupedTasks = {};
+  Map<String, List<Task>> _ongoingGroupedTasks = {};
+  Map<String, List<Task>> _previousGroupedTasks = {};
   bool _isLoading = true;
   Timer? _refreshTimer;
   late AnimationController _fabController;
@@ -54,15 +55,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       return a.time.compareTo(b.time);
     });
 
-    Map<String, List<Task>> grouped = {};
+    Map<String, List<Task>> ongoing = {};
+    Map<String, List<Task>> previous = {};
     for (var task in data) {
-      grouped.putIfAbsent(task.date, () => []).add(task);
+      if (task.isCompleted == 0) {
+        ongoing.putIfAbsent(task.date, () => []).add(task);
+      } else {
+        previous.putIfAbsent(task.date, () => []).add(task);
+      }
     }
 
     if (mounted) {
       setState(() {
         _tasks = data;
-        _groupedTasks = grouped;
+        _ongoingGroupedTasks = ongoing;
+        _previousGroupedTasks = previous;
         _isLoading = false;
       });
     }
@@ -658,27 +665,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ? SliverFillRemaining(child: _buildEmptyState())
                           : SliverPadding(
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                              sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    String dateKey =
-                                        _groupedTasks.keys.elementAt(index);
-                                    List<Task> tasksForDate =
-                                        _groupedTasks[dateKey]!;
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildDateHeader(dateKey, index),
-                                        ...tasksForDate
-                                            .asMap()
-                                            .entries
-                                            .map((e) => _buildTaskCard(
-                                                e.value, index * 3 + e.key)),
-                                      ],
-                                    );
-                                  },
-                                  childCount: _groupedTasks.keys.length,
+                              sliver: SliverToBoxAdapter(
+                                child: Column(
+                                  children: [
+                                    _buildHistoryPanel(
+                                      'On-Going Tasks', 
+                                      _ongoingGroupedTasks, 
+                                      Icons.timelapse_rounded,
+                                    ),
+                                    _buildHistoryPanel(
+                                      'Previous Tasks', 
+                                      _previousGroupedTasks, 
+                                      Icons.history_rounded,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -703,6 +703,58 @@ class _DashboardScreenState extends State<DashboardScreen>
             style: TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryPanel(String title, Map<String, List<Task>> grouped, IconData icon) {
+    if (grouped.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          collapsedBackgroundColor: AppColors.bgCard.withOpacity(0.5),
+          backgroundColor: AppColors.bgCard.withOpacity(0.8),
+          iconColor: AppColors.primaryGlow,
+          collapsedIconColor: AppColors.textMuted,
+          initiallyExpanded: title.contains('On-Going'),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          title: Row(
+            children: [
+              Icon(icon, color: AppColors.primaryGlow, size: 22),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: grouped.entries.map((entry) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDateHeader(entry.key, 0),
+                      ...entry.value.asMap().entries.map((e) => _buildTaskCard(e.value, e.key)),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );

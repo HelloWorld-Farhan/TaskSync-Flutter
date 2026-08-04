@@ -23,12 +23,14 @@ class AddTaskScreen extends StatefulWidget {
 class _AddTaskScreenState extends State<AddTaskScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  final _dateController = TextEditingController();
-  final _timeController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _customDatesController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _timeController = TextEditingController();
+  final TextEditingController _customDatesController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+
+  final FocusNode _dateFocusNode = FocusNode();
 
   bool _isSaving = false;
   late bool _isAm;
@@ -56,6 +58,21 @@ class _AddTaskScreenState extends State<AddTaskScreen>
     );
     _loadSavedEmails();
     _dateController.addListener(_updateDayName);
+
+    _dateFocusNode.addListener(() {
+      if (!_dateFocusNode.hasFocus) {
+        String text = _dateController.text.trim();
+        if (text.length == 1 || text.length == 2) {
+          int? day = int.tryParse(text);
+          if (day != null && day >= 1 && day <= 31) {
+            DateTime now = DateTime.now();
+            String formatted = "${day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}";
+            _dateController.text = formatted;
+            _updateDayName();
+          }
+        }
+      }
+    });
 
     if (widget.taskToEdit != null) {
       _titleController.text = widget.taskToEdit!.title;
@@ -127,8 +144,9 @@ class _AddTaskScreenState extends State<AddTaskScreen>
     _descController.dispose();
     _dateController.dispose();
     _timeController.dispose();
-    _emailController.dispose();
     _customDatesController.dispose();
+    _emailController.dispose();
+    _dateFocusNode.dispose();
     super.dispose();
   }
 
@@ -443,11 +461,30 @@ class _AddTaskScreenState extends State<AddTaskScreen>
 
                           _buildField(
                             controller: _dateController,
+                            focusNode: _dateFocusNode,
                             label: 'Date (DD/MM/YYYY)',
                             icon: Icons.calendar_month_rounded,
                             keyboardType: TextInputType.number,
                             inputFormatters: [_dateFormatter],
                             delay: 300,
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.only(right: 8.0, top: 8.0, bottom: 8.0),
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
+                                  _dateController.text = "${tomorrow.day.toString().padLeft(2, '0')}/${tomorrow.month.toString().padLeft(2, '0')}/${tomorrow.year}";
+                                  _updateDayName();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary.withOpacity(0.2),
+                                  foregroundColor: AppColors.primaryGlow,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: const Text('Tomorrow', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
                             validator: (val) {
                               if (val == null || val.isEmpty)
                                 return 'Date required';
@@ -685,6 +722,7 @@ class _AddTaskScreenState extends State<AddTaskScreen>
     int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
+    Widget? suffixIcon,
     int delay = 0,
   }) {
     return TextFormField(
@@ -695,7 +733,7 @@ class _AddTaskScreenState extends State<AddTaskScreen>
       inputFormatters: inputFormatters,
       validator: validator,
       style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
-      decoration: AppTheme.fieldDecoration(label: label, icon: icon),
+      decoration: AppTheme.fieldDecoration(label: label, icon: icon, suffixIcon: suffixIcon),
     ).animate().fade(delay: delay.ms, duration: 350.ms).slideX(
         begin: 0.08, end: 0, delay: delay.ms, duration: 350.ms);
   }
