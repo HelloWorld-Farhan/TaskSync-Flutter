@@ -503,7 +503,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             Text(routine['title'] as String,
                 style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
             const SizedBox(height: 4),
-            Text('${routine['start_time']} – ${routine['end_time']}',
+            Text('${_formatTime(routine['start_time'])} – ${_formatTime(routine['end_time'])}',
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 6),
             Wrap(spacing: 4, children: days.map((d) => Container(
@@ -541,6 +541,29 @@ class _DashboardScreenState extends State<DashboardScreen>
           ..._historyTasks.map((t) => _taskCard(t, isHistory: true)).toList(),
       ],
     );
+  }
+
+  String _formatTime(String time24) {
+    try {
+      final parts = time24.split(':');
+      if (parts.length != 2) return time24;
+      int h = int.parse(parts[0].trim());
+      int m = int.parse(parts[1].trim());
+      String ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h == 0) h = 12;
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $ampm';
+    } catch (e) {
+      return time24;
+    }
+  }
+
+  String _formatTimeRange(String time) {
+    if (time.contains(' - ')) {
+      final parts = time.split(' - ');
+      return '${_formatTime(parts[0])} - ${_formatTime(parts[1])}';
+    }
+    return _formatTime(time);
   }
 
   Widget _taskCard(Task task, {required bool isHistory}) {
@@ -595,7 +618,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             Row(children: [
               const Icon(Icons.access_time_rounded, size: 12, color: AppColors.textMuted),
               const SizedBox(width: 4),
-              Text(task.time, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              Text(_formatTime(task.time), style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(width: 8),
               const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textMuted),
               const SizedBox(width: 4),
@@ -643,11 +666,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: Text('$percent%', style: TextStyle(color: pColor, fontSize: 11, fontWeight: FontWeight.w700)),
           ),
         ]),
-        if (items.where((item) => item['status'] != 'pending').isNotEmpty) ...[
+        if (items.isNotEmpty) ...[
           const SizedBox(height: 10),
           const Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 8),
-          ...items.where((item) => item['status'] != 'pending').map((item) => Padding(
+          ...items.map((item) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(children: [
               Icon(

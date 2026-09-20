@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import '../main.dart';
+import 'database_helper.dart';
 import '../screens/routine_alarm_screen.dart';
 
 class NotificationService {
@@ -96,9 +98,23 @@ class NotificationService {
       visibility: NotificationVisibility.public,
       playSound: true,
       enableVibration: true,
-      ongoing: false,
-      autoCancel: true,
+      ongoing: true,
+      autoCancel: false,
       showWhen: true,
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'done_action',
+          '✅ Done',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+        AndroidNotificationAction(
+          'decline_action',
+          '❌ Decline',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+      ],
     );
 
     final NotificationDetails details = NotificationDetails(android: androidDetails);
@@ -172,6 +188,42 @@ class NotificationService {
 }
 
 @pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse notificationResponse) {
-  // Background tap — handled by system
+void notificationTapBackground(NotificationResponse notificationResponse) async {
+  final actionId = notificationResponse.actionId;
+  final payload = notificationResponse.payload;
+
+  if (actionId != null && payload != null) {
+    bool isDone = actionId == 'done_action';
+    
+    if (payload.startsWith('routine_')) {
+      final parts = payload.split('_');
+      if (parts.length >= 2) {
+        int routineId = int.tryParse(parts[1]) ?? 0;
+        if (routineId != 0) {
+          final routines = await DatabaseHelper.instance.readAllRoutines();
+          try {
+            final routine = routines.firstWhere((r) => r['id'] == routineId);
+            await DatabaseHelper.instance.insertRoutineHistory(
+              routineId, 
+              isDone ? 100 : 0
+            );
+          } catch (e) {
+            // routine not found
+          }
+        }
+      }
+    } else if (payload.startsWith('task_')) {
+      final parts = payload.split('_');
+      if (parts.length >= 2) {
+        int taskId = int.tryParse(parts[1]) ?? 0;
+        if (taskId != 0) {
+          final task = await DatabaseHelper.instance.readTask(taskId);
+          final updatedTask = task.copy(
+            isCompleted: isDone ? 1 : 2
+          );
+          await DatabaseHelper.instance.update(updatedTask);
+        }
+      }
+    }
+  }
 }
