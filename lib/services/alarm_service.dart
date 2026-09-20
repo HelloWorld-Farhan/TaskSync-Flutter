@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import 'database_helper.dart';
 import 'email_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'notification_service.dart';
 
 @pragma('vm:entry-point')
