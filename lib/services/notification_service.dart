@@ -152,7 +152,7 @@ class NotificationService {
 
   /// Cancel a specific notification
   static Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
+    await flutterLocalNotificationsPlugin.cancel(id, tag: null);
   }
 
   /// Cancel all notifications

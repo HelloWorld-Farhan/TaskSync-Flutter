@@ -338,13 +338,28 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       floatingActionButton: ScaleTransition(
         scale: CurvedAnimation(parent: _fabController, curve: Curves.elasticOut),
-        child: FloatingActionButton.extended(
-          onPressed: _showRecurrenceSelector,
-          backgroundColor: AppColors.primary,
-          elevation: 8,
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text('New Reminder',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryGlow.withValues(alpha: 0.6),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton.extended(
+            onPressed: _showRecurrenceSelector,
+            backgroundColor: AppColors.primary,
+            splashColor: AppColors.accentLight.withValues(alpha: 0.3),
+            elevation: 0,
+            highlightElevation: 0,
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text('New Reminder',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
         ),
       ),
     );
@@ -388,23 +403,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                       style: const TextStyle(color: Colors.white70, fontSize: 10)),
               ]),
             ]),
-          ),
-        ),
-        const SizedBox(width: 10),
-        // Routines button
-        GestureDetector(
-          onTap: () async {
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutinesScreen()));
-            _refreshTasks();
-          },
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            child: const Icon(Icons.checklist_rtl_rounded, color: AppColors.accentLight, size: 20),
           ),
         ),
       ]),
