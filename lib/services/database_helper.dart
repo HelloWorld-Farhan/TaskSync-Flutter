@@ -314,7 +314,7 @@ CREATE TABLE daily_scores (
         status = 'done';
         total += 100;
         earned += 100;
-      } else if (t['time'].toString().compareTo(currentTimeStr) < 0) {
+      } else if ((t['isCompleted'] as int) == 2) {
         pts = 0;
         status = 'missed';
         total += 100;
@@ -342,7 +342,7 @@ CREATE TABLE daily_scores (
           status = 'done';
           total += 100;
           earned += 100;
-        } else if (t['time'].toString().compareTo(currentTimeStr) < 0) {
+        } else if ((t['isCompleted'] as int) == 2) {
           pts = 0;
           status = 'missed';
           total += 100;
@@ -373,20 +373,19 @@ CREATE TABLE daily_scores (
         String status = 'pending';
         
         if (history.isNotEmpty) {
-          pts = history.first['score'] as int;
-          status = pts > 0 ? 'done' : 'missed';
-          total += 100;
-          earned += pts;
-        } else {
-          // No history yet for today
-          if (r['end_time'].toString().compareTo(currentTimeStr) < 0) {
+          int hPts = history.first['score'] as int;
+          if (hPts == -1) {
             pts = 0;
-            status = 'missed';
-            total += 100;
-          } else {
-            pts = 0; 
             status = 'pending';
+          } else {
+            pts = hPts;
+            status = pts > 0 ? 'done' : 'missed';
+            total += 100;
+            earned += pts;
           }
+        } else {
+          pts = 0; 
+          status = 'pending';
         }
         breakdown.add({
           'type': 'routine',

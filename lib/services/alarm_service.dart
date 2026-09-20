@@ -43,7 +43,21 @@ void alarmCallback(int id) async {
       id, 
       "Reminder: ${task.title}", 
       "It's time for your reminder!", 
-      "reminder_$id",
+      "task_$id",
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'task_done',
+          '✅ Done',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+        AndroidNotificationAction(
+          'task_cancel',
+          '❌ Cancel',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+      ]
     );
 
     // Send email

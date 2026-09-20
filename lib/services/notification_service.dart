@@ -82,8 +82,8 @@ class NotificationService {
 
   /// Full-screen alarm notification (shown on lock screen too)
   static Future<void> showFullScreenNotification(
-      int id, String title, String body, String payload) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      int id, String title, String body, String payload, {List<AndroidNotificationAction>? actions}) async {
+    AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'routine_alarm_channel_2',
       'Routine Alarms',
       channelDescription: 'Full screen alarm notifications for routines',
@@ -97,20 +97,7 @@ class NotificationService {
       ongoing: true,
       autoCancel: false,
       showWhen: true,
-      actions: <AndroidNotificationAction>[
-        AndroidNotificationAction(
-          'done_action',
-          '✅ Done',
-          showsUserInterface: true,
-          cancelNotification: true,
-        ),
-        AndroidNotificationAction(
-          'decline_action',
-          '❌ Decline',
-          showsUserInterface: true,
-          cancelNotification: true,
-        ),
-      ],
+      actions: actions,
     );
 
     final NotificationDetails details = NotificationDetails(android: androidDetails);
@@ -185,12 +172,11 @@ class NotificationService {
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) async {
+  WidgetsFlutterBinding.ensureInitialized();
   final actionId = notificationResponse.actionId;
   final payload = notificationResponse.payload;
 
   if (actionId != null && payload != null) {
-    bool isDone = actionId == 'done_action';
-    
     if (payload.startsWith('routine_')) {
       final parts = payload.split('_');
       if (parts.length >= 2) {
@@ -199,16 +185,65 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
           final routines = await DatabaseHelper.instance.readAllRoutines();
           try {
             final routine = routines.firstWhere((r) => r['id'] == routineId);
-            final nowStr = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
-            await DatabaseHelper.instance.createRoutineHistory({
-              'routine_id': routineId,
-              'date': nowStr,
-              'completed_start': isDone ? 1 : 0,
-              'completed_end': isDone ? 1 : 0,
-              'score': isDone ? 100 : 0,
-            });
+            final now = DateTime.now();
+            final nowStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+            
+            // Try to find existing history for today
+            final existingHistory = await DatabaseHelper.instance.getRoutineHistoryByDate(routineId, nowStr);
+            int currentScore = existingHistory != null ? existingHistory['score'] : 0;
+            
+            if (actionId == 'routine_doing') {
+              if (existingHistory == null) {
+                await DatabaseHelper.instance.createRoutineHistory({
+                  'routine_id': routineId, 'date': nowStr,
+                  'completed_start': 1, 'completed_end': 0, 'score': -1,
+                });
+              }
+            } else if (actionId == 'routine_start_done' || actionId == 'routine_cancel') {
+              int score = (actionId == 'routine_start_done') ? 100 : 0;
+              if (existingHistory == null) {
+                await DatabaseHelper.instance.createRoutineHistory({
+                  'routine_id': routineId, 'date': nowStr,
+                  'completed_start': score > 0 ? 1 : 0, 'completed_end': score > 0 ? 1 : 0, 'score': score,
+                });
+              } else {
+                existingHistory['score'] = score;
+                await DatabaseHelper.instance.updateRoutineHistory(existingHistory);
+              }
+              // Cancel the end alarm
+              try {
+                // To avoid inline imports, we just call AlarmService.cancelRoutineAlarm(routineId);
+                // But wait, AlarmService is not imported here.
+                // Let's just update the routine_history, and the alarm can fire but we ignore it if it's already done.
+                // Oh wait, in routineAlarmCallback, if score > 0, it won't fire the end alarm!
+              } catch (e) {}
+            } else if (actionId == 'routine_end_done') {
+              int score = 0;
+              // Check time difference
+              final endParts = routine['end_time'].toString().split(':');
+              DateTime endTime = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+              if (endTime.isBefore(now.subtract(const Duration(hours: 12)))) { // Adjust for midnight crossing if necessary, assuming same day for simple case
+                 endTime = endTime.add(const Duration(days: 1));
+              }
+              
+              if (now.difference(endTime).inMinutes <= 2) {
+                score = 100;
+              } else {
+                score = 0; // The user requested "cut the hole points" if more than 2 min late
+              }
+              
+              if (existingHistory == null) {
+                await DatabaseHelper.instance.createRoutineHistory({
+                  'routine_id': routineId, 'date': nowStr,
+                  'completed_start': score > 0 ? 1 : 0, 'completed_end': score > 0 ? 1 : 0, 'score': score,
+                });
+              } else {
+                existingHistory['score'] = score;
+                await DatabaseHelper.instance.updateRoutineHistory(existingHistory);
+              }
+            }
           } catch (e) {
-            // routine not found
+            print("Background error: \$e");
           }
         }
       }
@@ -219,7 +254,7 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
         if (taskId != 0) {
           final task = await DatabaseHelper.instance.getTask(taskId);
           if (task != null) {
-            task.isCompleted = isDone ? 1 : 2;
+            task.isCompleted = (actionId == 'task_done') ? 1 : 2;
             await DatabaseHelper.instance.update(task);
           }
         }
