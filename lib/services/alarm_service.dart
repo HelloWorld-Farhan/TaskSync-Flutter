@@ -9,13 +9,15 @@ import 'notification_service.dart';
 @pragma('vm:entry-point')
 void alarmCallback(int id) async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize(isBackground: true);
+  
   final task = await DatabaseHelper.instance.getTask(id);
   
   if (task != null) {
     // 1. Check if task is already completed (One-time tasks)
     if (task.isCompleted == 1) return;
 
-    // 2. Prevent glitch fires (e.g., from app update/reboot rescheduling future/past alarms incorrectly)
+    // 2. Prevent glitch fires
     try {
       final dateParts = task.date.split('-');
       final timeParts = task.time.split(':');
@@ -35,6 +37,14 @@ void alarmCallback(int id) async {
     } catch (e) {
       print('Error parsing date/time for glitch check: $e');
     }
+
+    // Show full screen local notification alarm
+    await NotificationService.showFullScreenNotification(
+      id, 
+      "Reminder: ${task.title}", 
+      "It's time for your reminder!", 
+      "reminder_$id",
+    );
 
     // Send email
     bool success = await EmailService.sendEmailNow(
@@ -57,14 +67,10 @@ void alarmCallback(int id) async {
       DateTime now = DateTime.now();
       DateTime nextTime = now.add(const Duration(days: 1));
       
-      // Update DB with new date
       task.date = DateFormat('yyyy-MM-dd').format(nextTime);
       await DatabaseHelper.instance.update(task);
-      
-      // Schedule next alarm
       await AlarmService.scheduleAlarm(task);
     } else if (task.recurrenceType == 'Custom' && task.customDates.isNotEmpty) {
-      // Find the next date in the comma-separated list
       List<String> dates = task.customDates.split(',').map((e) => e.trim()).toList();
       dates.sort();
       
@@ -87,7 +93,6 @@ void alarmCallback(int id) async {
         await DatabaseHelper.instance.update(task);
       }
     } else {
-      // Once
       task.isCompleted = 1;
       await DatabaseHelper.instance.update(task);
     }
@@ -127,7 +132,6 @@ class AlarmService {
   static Future<void> scheduleAlarm(Task task) async {
     if (task.id == null) return;
     
-    // Parse task date and time
     try {
       final dateParts = task.date.split('-');
       final timeParts = task.time.split(':');
@@ -140,7 +144,6 @@ class AlarmService {
         int.parse(timeParts[1]),
       );
 
-      // If scheduled time is in the past (e.g. today but past time), and it's daily, add 1 day
       if (scheduledTime.isBefore(DateTime.now()) && task.recurrenceType == 'Daily') {
         scheduledTime = scheduledTime.add(const Duration(days: 1));
         task.date = DateFormat('yyyy-MM-dd').format(scheduledTime);
@@ -170,34 +173,24 @@ class AlarmService {
   }
 
   static Future<void> startRetryTimer() async {
-    // Schedule a periodic alarm every 1 minute to retry sending emails
     await AndroidAlarmManager.periodic(
       const Duration(minutes: 1),
-      99999, // Unique ID for retry timer
+      99999,
       retryCallback,
       exact: true,
       wakeup: true,
       rescheduleOnReboot: true,
     );
-    print('Started offline retry timer');
   }
 
   static Future<void> stopRetryTimer() async {
     await AndroidAlarmManager.cancel(99999);
-    print('Stopped offline retry timer');
   }
 
   // --- Routine Alarms ---
   static Future<void> scheduleRoutineAlarm(Map<String, dynamic> routine) async {
     int routineId = routine['id'];
-    String daysOfWeek = routine['days_of_week']; // "Mon,Tue,Wed"
-    
-    // We only schedule for the next valid day.
-    // Or just schedule a periodic daily alarm, and inside the callback, check if today is valid.
-    // Given the requirements, a daily alarm that checks daysOfWeek is simpler.
-    
     DateTime now = DateTime.now();
-    // Parse times
     final startParts = routine['start_time'].toString().split(':');
     final endParts = routine['end_time'].toString().split(':');
     
@@ -229,7 +222,6 @@ class AlarmService {
       wakeup: true,
       rescheduleOnReboot: true,
     );
-    print('Routine alarms scheduled for ID $routineId');
   }
   
   static Future<void> cancelRoutineAlarm(int routineId) async {
@@ -241,26 +233,23 @@ class AlarmService {
 @pragma('vm:entry-point')
 void routineAlarmCallback(int id) async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize(isBackground: true);
+  
   int routineId = id ~/ 100;
-  int type = id % 100; // 1 = start, 2 = end
+  int type = id % 100;
   
   final routine = await DatabaseHelper.instance.getRoutine(routineId);
   if (routine == null) return;
 
-  // Check if today is a valid day for this routine
   List<String> days = routine['days_of_week'].toString().split(',');
   List<String> weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   String todayStr = weekDays[DateTime.now().weekday - 1];
   
-  if (!days.contains(todayStr)) {
-    print('Routine $routineId not scheduled for today ($todayStr). Skipping.');
-    return;
-  }
+  if (!days.contains(todayStr)) return;
 
-  // Trigger Full Screen Notification
   String title = routine['title'];
   String body = type == 1 ? "Time to start your routine!" : "Routine time is over!";
-  String payload = "routine_${routineId}_${type}";
+  String payload = "routine_${routineId}_$type";
   
   await NotificationService.showFullScreenNotification(id, title, body, payload);
 }

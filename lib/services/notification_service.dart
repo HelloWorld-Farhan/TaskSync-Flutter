@@ -7,7 +7,7 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  static Future<void> initialize() async {
+  static Future<void> initialize({bool isBackground = false}) async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -17,7 +17,7 @@ class NotificationService {
     final androidImplementation = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-    if (androidImplementation != null) {
+    if (androidImplementation != null && !isBackground) {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
     }
@@ -25,6 +25,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        if (isBackground) return; // Cannot push to navigator from background isolate
         final payload = response.payload ?? '';
         if (payload.startsWith('routine_')) {
           final parts = payload.split('_');

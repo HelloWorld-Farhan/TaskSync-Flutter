@@ -643,11 +643,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: Text('$percent%', style: TextStyle(color: pColor, fontSize: 11, fontWeight: FontWeight.w700)),
           ),
         ]),
-        if (items.isNotEmpty) ...[
+        if (items.where((item) => item['status'] != 'pending').isNotEmpty) ...[
           const SizedBox(height: 10),
           const Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 8),
-          ...items.map((item) => Padding(
+          ...items.where((item) => item['status'] != 'pending').map((item) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(children: [
               Icon(
