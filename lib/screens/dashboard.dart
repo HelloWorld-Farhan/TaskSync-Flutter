@@ -430,7 +430,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
         tabs: const [
-          Tab(text: '📅  Schedule'),
+          Tab(text: '📅  Daily Routine'),
           Tab(text: '🔔  Reminders'),
         ],
       ),

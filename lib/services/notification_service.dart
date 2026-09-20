@@ -84,6 +84,7 @@ class NotificationService {
       priority: Priority.max,
       fullScreenIntent: true,
       category: AndroidNotificationCategory.alarm,
+      visibility: NotificationVisibility.public,
       playSound: true,
       enableVibration: true,
       ongoing: false,

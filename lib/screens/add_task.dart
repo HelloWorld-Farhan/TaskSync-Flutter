@@ -189,6 +189,16 @@ class _AddTaskScreenState extends State<AddTaskScreen>
     }
 
     if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text(widget.taskToEdit == null ? 'Reminder created!' : 'Reminder updated!'),
+        ]),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
       Navigator.of(context).pop(true);
     }
   }
