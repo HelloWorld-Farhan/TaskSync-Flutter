@@ -19,10 +19,6 @@ class NotificationService {
     final androidImplementation = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-    if (androidImplementation != null && !isBackground) {
-      await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
-    }
 
     await flutterLocalNotificationsPlugin.initialize(
       settings: initializationSettings,
@@ -57,7 +53,7 @@ class NotificationService {
 
     // Create notification channels
     const AndroidNotificationChannel alarmChannel = AndroidNotificationChannel(
-      'routine_alarm_channel',
+      'routine_alarm_channel_2',
       'Routine Alarms',
       description: 'Full screen alarm notifications for routines',
       importance: Importance.max,
@@ -88,7 +84,7 @@ class NotificationService {
   static Future<void> showFullScreenNotification(
       int id, String title, String body, String payload) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'routine_alarm_channel',
+      'routine_alarm_channel_2',
       'Routine Alarms',
       channelDescription: 'Full screen alarm notifications for routines',
       importance: Importance.max,
