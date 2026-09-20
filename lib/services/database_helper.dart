@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -57,6 +58,17 @@ CREATE TABLE IF NOT EXISTS routine_history (
   completed_start INTEGER NOT NULL,
   completed_end INTEGER NOT NULL,
   score INTEGER NOT NULL
+  )
+''');
+    }
+    if (oldVersion < 5) {
+      await db.execute('''
+CREATE TABLE IF NOT EXISTS daily_scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT NOT NULL UNIQUE,
+  earned_points INTEGER NOT NULL DEFAULT 0,
+  total_points INTEGER NOT NULL DEFAULT 0,
+  breakdown_json TEXT NOT NULL DEFAULT '[]'
   )
 ''');
     }
@@ -111,8 +123,19 @@ CREATE TABLE routine_history (
   score $intType
   )
 ''');
+
+    await db.execute('''
+CREATE TABLE daily_scores (
+  id $idType,
+  date $textType UNIQUE,
+  earned_points $intType DEFAULT 0,
+  total_points $intType DEFAULT 0,
+  breakdown_json TEXT NOT NULL DEFAULT '[]'
+  )
+''');
   }
 
+  // --- Tasks ---
   Future<Task> create(Task task) async {
     final db = await instance.database;
     final id = await db.insert('tasks', task.toMap());
@@ -122,7 +145,7 @@ CREATE TABLE routine_history (
 
   Future<List<Task>> readAllTasks() async {
     final db = await instance.database;
-    final orderBy = 'date ASC, time ASC';
+    const orderBy = 'date ASC, time ASC';
     final result = await db.query('tasks', orderBy: orderBy);
     return result.map((json) => Task.fromMap(json)).toList();
   }
@@ -135,42 +158,24 @@ CREATE TABLE routine_history (
       where: 'id = ?',
       whereArgs: [id],
     );
-
-    if (maps.isNotEmpty) {
-      return Task.fromMap(maps.first);
-    } else {
-      return null;
-    }
+    if (maps.isNotEmpty) return Task.fromMap(maps.first);
+    return null;
   }
 
   Future<int> update(Task task) async {
     final db = await instance.database;
-    return db.update(
-      'tasks',
-      task.toMap(),
-      where: 'id = ?',
-      whereArgs: [task.id],
-    );
+    return db.update('tasks', task.toMap(), where: 'id = ?', whereArgs: [task.id]);
   }
 
   Future<int> delete(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
   }
 
   // --- Pending Emails ---
-
   Future<void> insertPendingEmail(String email, String title, String description) async {
     final db = await instance.database;
-    await db.insert('pending_emails', {
-      'email': email,
-      'title': title,
-      'description': description,
-    });
+    await db.insert('pending_emails', {'email': email, 'title': title, 'description': description});
   }
 
   Future<List<Map<String, dynamic>>> readAllPendingEmails() async {
@@ -180,11 +185,7 @@ CREATE TABLE routine_history (
 
   Future<void> deletePendingEmail(int id) async {
     final db = await instance.database;
-    await db.delete(
-      'pending_emails',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('pending_emails', where: 'id = ?', whereArgs: [id]);
   }
 
   // --- Routines ---
@@ -200,34 +201,20 @@ CREATE TABLE routine_history (
 
   Future<Map<String, dynamic>?> getRoutine(int id) async {
     final db = await instance.database;
-    final maps = await db.query(
-      'routines',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final maps = await db.query('routines', where: 'id = ?', whereArgs: [id]);
     if (maps.isNotEmpty) return maps.first;
     return null;
   }
 
   Future<int> updateRoutine(Map<String, dynamic> routine) async {
     final db = await instance.database;
-    return db.update(
-      'routines',
-      routine,
-      where: 'id = ?',
-      whereArgs: [routine['id']],
-    );
+    return db.update('routines', routine, where: 'id = ?', whereArgs: [routine['id']]);
   }
 
   Future<int> deleteRoutine(int id) async {
     final db = await instance.database;
-    // Also delete history
     await db.delete('routine_history', where: 'routine_id = ?', whereArgs: [id]);
-    return await db.delete(
-      'routines',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('routines', where: 'id = ?', whereArgs: [id]);
   }
 
   // --- Routine History ---
@@ -238,32 +225,147 @@ CREATE TABLE routine_history (
 
   Future<List<Map<String, dynamic>>> readRoutineHistory(int routineId) async {
     final db = await instance.database;
-    return await db.query(
-      'routine_history',
-      where: 'routine_id = ?',
-      whereArgs: [routineId],
-      orderBy: 'date DESC',
-    );
+    return await db.query('routine_history',
+        where: 'routine_id = ?', whereArgs: [routineId], orderBy: 'date DESC');
   }
-  
+
   Future<Map<String, dynamic>?> getRoutineHistoryByDate(int routineId, String date) async {
     final db = await instance.database;
-    final maps = await db.query(
-      'routine_history',
-      where: 'routine_id = ? AND date = ?',
-      whereArgs: [routineId, date],
-    );
+    final maps = await db.query('routine_history',
+        where: 'routine_id = ? AND date = ?', whereArgs: [routineId, date]);
     if (maps.isNotEmpty) return maps.first;
     return null;
   }
-  
+
   Future<int> updateRoutineHistory(Map<String, dynamic> history) async {
     final db = await instance.database;
-    return db.update(
-      'routine_history',
-      history,
-      where: 'id = ?',
-      whereArgs: [history['id']],
-    );
+    return db.update('routine_history', history, where: 'id = ?', whereArgs: [history['id']]);
+  }
+
+  // --- Daily Scores ---
+
+  /// Saves or updates today's score snapshot
+  Future<void> saveDailyScore({
+    required String date,
+    required int earnedPoints,
+    required int totalPoints,
+    required List<Map<String, dynamic>> breakdown,
+  }) async {
+    final db = await instance.database;
+    final existing = await db.query('daily_scores', where: 'date = ?', whereArgs: [date]);
+    final data = {
+      'date': date,
+      'earned_points': earnedPoints,
+      'total_points': totalPoints,
+      'breakdown_json': jsonEncode(breakdown),
+    };
+    if (existing.isEmpty) {
+      await db.insert('daily_scores', data);
+    } else {
+      await db.update('daily_scores', data, where: 'date = ?', whereArgs: [date]);
+    }
+  }
+
+  /// Gets today's score record
+  Future<Map<String, dynamic>?> getDailyScore(String date) async {
+    final db = await instance.database;
+    final maps = await db.query('daily_scores', where: 'date = ?', whereArgs: [date]);
+    if (maps.isNotEmpty) {
+      final row = Map<String, dynamic>.from(maps.first);
+      row['breakdown'] = jsonDecode(row['breakdown_json'] as String);
+      return row;
+    }
+    return null;
+  }
+
+  /// Gets all past daily scores ordered by date desc
+  Future<List<Map<String, dynamic>>> getDailyScoreHistory() async {
+    final db = await instance.database;
+    final results = await db.query('daily_scores', orderBy: 'date DESC');
+    return results.map((row) {
+      final r = Map<String, dynamic>.from(row);
+      r['breakdown'] = jsonDecode(r['breakdown_json'] as String);
+      return r;
+    }).toList();
+  }
+
+  /// Calculate today's score from tasks and routines
+  Future<Map<String, dynamic>> calculateTodayScore(String todayDate, String todayDayShort) async {
+    final db = await instance.database;
+
+    List<Map<String, dynamic>> breakdown = [];
+    int earned = 0;
+    int total = 0;
+
+    // --- Tasks scheduled for today ---
+    final tasks = await db.query('tasks', where: "date = ? AND recurrenceType = 'Once'", whereArgs: [todayDate]);
+    // Daily recurring tasks
+    final dailyTasks = await db.query('tasks', where: "recurrenceType = 'Daily'");
+    // Custom tasks that include today
+    final customTasks = await db.query('tasks', where: "recurrenceType = 'Custom'");
+
+    for (var t in [...tasks, ...dailyTasks]) {
+      total += 100;
+      final pts = (t['isCompleted'] as int) == 1 ? 100 : 0;
+      earned += pts;
+      breakdown.add({
+        'type': 'reminder',
+        'title': t['title'],
+        'time': t['time'],
+        'status': (t['isCompleted'] as int) == 1 ? 'done' : 'missed',
+        'points': pts,
+        'max': 100,
+      });
+    }
+
+    for (var t in customTasks) {
+      final customDates = (t['customDates'] as String).split(',');
+      if (customDates.contains(todayDate)) {
+        total += 100;
+        final pts = (t['isCompleted'] as int) == 1 ? 100 : 0;
+        earned += pts;
+        breakdown.add({
+          'type': 'reminder',
+          'title': t['title'],
+          'time': t['time'],
+          'status': (t['isCompleted'] as int) == 1 ? 'done' : 'missed',
+          'points': pts,
+          'max': 100,
+        });
+      }
+    }
+
+    // --- Routines for today's day ---
+    final routines = await db.query('routines');
+    for (var r in routines) {
+      final days = (r['days_of_week'] as String).split(',');
+      if (days.contains(todayDayShort)) {
+        total += 100;
+        // Check history for completion today
+        final history = await db.query('routine_history',
+            where: "routine_id = ? AND date = ?", whereArgs: [r['id'], todayDate]);
+        int pts = 0;
+        String status = 'pending';
+        if (history.isNotEmpty) {
+          pts = history.first['score'] as int;
+          status = pts > 0 ? 'done' : 'missed';
+        }
+        earned += pts;
+        breakdown.add({
+          'type': 'routine',
+          'title': r['title'],
+          'time': '${r['start_time']} - ${r['end_time']}',
+          'status': status,
+          'points': pts,
+          'max': 100,
+        });
+      }
+    }
+
+    return {
+      'earned': earned,
+      'total': total,
+      'breakdown': breakdown,
+    };
   }
 }

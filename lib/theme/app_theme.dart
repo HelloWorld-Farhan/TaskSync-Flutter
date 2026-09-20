@@ -2,58 +2,70 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Backgrounds
-  static const Color bgDeep      = Color(0xFF0A0E1A);
-  static const Color bgMid       = Color(0xFF111827);
-  static const Color bgCard      = Color(0xFF1A2035);
-  static const Color bgCardAlt   = Color(0xFF1E2840);
+  // Backgrounds — Crimson Velvet
+  static const Color bgDeep      = Color(0xFF1A0A0D);
+  static const Color bgMid       = Color(0xFF2C0F12);
+  static const Color bgCard      = Color(0xFF3D1519);
+  static const Color bgCardAlt   = Color(0xFF4A1920);
 
-  // Accents
-  static const Color primary     = Color(0xFF7C3AED);
-  static const Color primaryGlow = Color(0xFFA78BFA);
-  static const Color secondary   = Color(0xFF06B6D4);
-  static const Color secondaryGlow = Color(0xFF67E8F9);
+  // Primary Crimson Accent
+  static const Color primary     = Color(0xFF6B1E23);
+  static const Color primaryGlow = Color(0xFF9B3A41);
+  static const Color accent      = Color(0xFFC0464F);
+  static const Color accentLight = Color(0xFFE07079);
 
   // Status
-  static const Color success     = Color(0xFF10B981);
+  static const Color success     = Color(0xFF22C55E);
+  static const Color successGlow = Color(0xFF4ADE80);
   static const Color warning     = Color(0xFFF59E0B);
-  static const Color danger      = Color(0xFFF43F5E);
-  static const Color dangerGlow  = Color(0xFFFB7185);
+  static const Color warningGlow = Color(0xFFFBBF24);
+  static const Color danger      = Color(0xFFEF4444);
+  static const Color dangerGlow  = Color(0xFFFCA5A5);
 
   // Text
-  static const Color textPrimary   = Color(0xFFF1F5F9);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted     = Color(0xFF475569);
+  static const Color textPrimary   = Color(0xFFFDF2F3);
+  static const Color textSecondary = Color(0xFFD4A0A5);
+  static const Color textMuted     = Color(0xFF8B5A60);
+
+  // Borders
+  static const Color border      = Color(0xFF5A1E24);
+  static const Color borderFocus = Color(0xFF9B3A41);
 
   // Gradients
   static const LinearGradient splashGradient = LinearGradient(
-    colors: [Color(0xFF0A0E1A), Color(0xFF130D2E), Color(0xFF0A0E1A)],
+    colors: [Color(0xFF1A0A0D), Color(0xFF3D1519), Color(0xFF1A0A0D)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+    colors: [Color(0xFF6B1E23), Color(0xFF9B3A41)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static const LinearGradient tealGradient = LinearGradient(
-    colors: [Color(0xFF06B6D4), Color(0xFF0891B2)],
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [Color(0xFF9B3A41), Color(0xFFC0464F)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF1A2035), Color(0xFF1E2840)],
+    colors: [Color(0xFF3D1519), Color(0xFF4A1920)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient dashGradient = LinearGradient(
-    colors: [Color(0xFF0A0E1A), Color(0xFF111827), Color(0xFF0F1729)],
+    colors: [Color(0xFF1A0A0D), Color(0xFF2C0F12), Color(0xFF1F0C0F)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
+  );
+
+  static const LinearGradient scoreGradient = LinearGradient(
+    colors: [Color(0xFF6B1E23), Color(0xFFC0464F)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 }
 
@@ -68,7 +80,7 @@ class AppTheme {
         brightness: Brightness.dark,
         surface: AppColors.bgCard,
         primary: AppColors.primary,
-        secondary: AppColors.secondary,
+        secondary: AppColors.accent,
         error: AppColors.danger,
         onPrimary: Colors.white,
         onSurface: AppColors.textPrimary,
@@ -92,13 +104,29 @@ class AppTheme {
         backgroundColor: AppColors.bgCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.bgCardAlt,
+        selectedColor: AppColors.primary,
+        labelStyle: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
+        secondaryLabelStyle: GoogleFonts.outfit(color: AppColors.textPrimary, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: const BorderSide(color: AppColors.border),
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
+          textStyle: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
         ),
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: AppColors.textPrimary,
+        unselectedLabelColor: AppColors.textMuted,
+        indicatorColor: AppColors.accent,
+        labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.outfit(fontSize: 14),
       ),
     );
   }
@@ -114,29 +142,29 @@ class AppTheme {
       hintText: hint,
       labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
       hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-      prefixIcon: Icon(icon, color: AppColors.primaryGlow, size: 20),
+      prefixIcon: Icon(icon, color: AppColors.accentLight, size: 20),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.bgCard,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: const BorderSide(color: Color(0xFF2D3748), width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: const BorderSide(color: AppColors.primaryGlow, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.borderFocus, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: AppColors.danger, width: 2),
       ),
       errorStyle: const TextStyle(color: AppColors.dangerGlow, fontSize: 12),

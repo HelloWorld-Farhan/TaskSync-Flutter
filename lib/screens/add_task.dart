@@ -196,7 +196,7 @@ class _AddTaskScreenState extends State<AddTaskScreen>
   Color _recurrenceColor() {
     switch (widget.recurrenceType) {
       case 'Daily':
-        return AppColors.secondary;
+        return AppColors.accent;
       case 'Custom':
         return AppColors.warning;
       default:
