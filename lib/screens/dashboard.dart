@@ -651,8 +651,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(children: [
               Icon(
-                item['status'] == 'done' ? Icons.check_circle_outline : Icons.cancel_outlined,
-                color: item['status'] == 'done' ? AppColors.success : AppColors.danger,
+                item['status'] == 'done'
+                    ? Icons.check_circle_outline
+                    : item['status'] == 'pending'
+                        ? Icons.schedule_rounded
+                        : Icons.cancel_outlined,
+                color: item['status'] == 'done'
+                    ? AppColors.success
+                    : item['status'] == 'pending'
+                        ? AppColors.warning
+                        : AppColors.danger,
                 size: 16,
               ),
               const SizedBox(width: 8),
@@ -660,7 +668,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
               Text('${item['points']} pts',
                   style: TextStyle(
-                    color: item['status'] == 'done' ? AppColors.success : AppColors.textMuted,
+                    color: item['status'] == 'done' 
+                        ? AppColors.success 
+                        : item['status'] == 'pending'
+                            ? AppColors.textMuted
+                            : AppColors.textMuted,
                     fontSize: 12, fontWeight: FontWeight.w600,
                   )),
             ]),

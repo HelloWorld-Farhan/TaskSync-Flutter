@@ -307,19 +307,21 @@ CREATE TABLE daily_scores (
     final currentTimeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     for (var t in [...tasks, ...dailyTasks]) {
-      total += 100;
       int pts = 0;
       String status = 'pending';
       if ((t['isCompleted'] as int) == 1) {
         pts = 100;
         status = 'done';
+        total += 100;
+        earned += 100;
       } else if (t['time'].toString().compareTo(currentTimeStr) < 0) {
         pts = 0;
         status = 'missed';
+        total += 100;
       } else {
-        pts = 100; // Pending items don't penalize score
+        pts = 0; 
+        status = 'pending';
       }
-      earned += pts;
       breakdown.add({
         'type': 'reminder',
         'title': t['title'],
@@ -333,19 +335,21 @@ CREATE TABLE daily_scores (
     for (var t in customTasks) {
       final customDates = (t['customDates'] as String).split(',');
       if (customDates.contains(todayDate)) {
-        total += 100;
         int pts = 0;
         String status = 'pending';
         if ((t['isCompleted'] as int) == 1) {
           pts = 100;
           status = 'done';
+          total += 100;
+          earned += 100;
         } else if (t['time'].toString().compareTo(currentTimeStr) < 0) {
           pts = 0;
           status = 'missed';
+          total += 100;
         } else {
-          pts = 100; // Pending items don't penalize score
+          pts = 0; 
+          status = 'pending';
         }
-        earned += pts;
         breakdown.add({
           'type': 'reminder',
           'title': t['title'],
@@ -362,7 +366,6 @@ CREATE TABLE daily_scores (
     for (var r in routines) {
       final days = (r['days_of_week'] as String).split(',');
       if (days.contains(todayDayShort)) {
-        total += 100;
         // Check history for completion today
         final history = await db.query('routine_history',
             where: "routine_id = ? AND date = ?", whereArgs: [r['id'], todayDate]);
@@ -372,16 +375,19 @@ CREATE TABLE daily_scores (
         if (history.isNotEmpty) {
           pts = history.first['score'] as int;
           status = pts > 0 ? 'done' : 'missed';
+          total += 100;
+          earned += pts;
         } else {
           // No history yet for today
           if (r['end_time'].toString().compareTo(currentTimeStr) < 0) {
             pts = 0;
             status = 'missed';
+            total += 100;
           } else {
-            pts = 100; // Pending items don't penalize score
+            pts = 0; 
+            status = 'pending';
           }
         }
-        earned += pts;
         breakdown.add({
           'type': 'routine',
           'title': r['title'],
