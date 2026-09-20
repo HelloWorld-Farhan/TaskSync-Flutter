@@ -76,7 +76,7 @@ class NotificationService {
   /// Full-screen alarm notification (shown on lock screen too)
   static Future<void> showFullScreenNotification(
       int id, String title, String body, String payload) async {
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'routine_alarm_channel',
       'Routine Alarms',
       channelDescription: 'Full screen alarm notifications for routines',
@@ -152,7 +152,7 @@ class NotificationService {
 
   /// Cancel a specific notification
   static Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id, tag: null);
+    await flutterLocalNotificationsPlugin.cancel(id: id, tag: null);
   }
 
   /// Cancel all notifications
