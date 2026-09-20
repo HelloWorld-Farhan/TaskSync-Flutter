@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -35,6 +35,28 @@ CREATE TABLE IF NOT EXISTS pending_emails (
   email TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT NOT NULL
+  )
+''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+CREATE TABLE IF NOT EXISTS routines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  days_of_week TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL
+  )
+''');
+      await db.execute('''
+CREATE TABLE IF NOT EXISTS routine_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  routine_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  completed_start INTEGER NOT NULL,
+  completed_end INTEGER NOT NULL,
+  score INTEGER NOT NULL
   )
 ''');
     }
@@ -65,6 +87,28 @@ CREATE TABLE pending_emails (
   email $textType,
   title $textType,
   description $textType
+  )
+''');
+
+    await db.execute('''
+CREATE TABLE routines (
+  id $idType,
+  title $textType,
+  description $textType,
+  days_of_week $textType,
+  start_time $textType,
+  end_time $textType
+  )
+''');
+
+    await db.execute('''
+CREATE TABLE routine_history (
+  id $idType,
+  routine_id $intType,
+  date $textType,
+  completed_start $intType,
+  completed_end $intType,
+  score $intType
   )
 ''');
   }
@@ -140,6 +184,86 @@ CREATE TABLE pending_emails (
       'pending_emails',
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  // --- Routines ---
+  Future<int> createRoutine(Map<String, dynamic> routine) async {
+    final db = await instance.database;
+    return await db.insert('routines', routine);
+  }
+
+  Future<List<Map<String, dynamic>>> readAllRoutines() async {
+    final db = await instance.database;
+    return await db.query('routines');
+  }
+
+  Future<Map<String, dynamic>?> getRoutine(int id) async {
+    final db = await instance.database;
+    final maps = await db.query(
+      'routines',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isNotEmpty) return maps.first;
+    return null;
+  }
+
+  Future<int> updateRoutine(Map<String, dynamic> routine) async {
+    final db = await instance.database;
+    return db.update(
+      'routines',
+      routine,
+      where: 'id = ?',
+      whereArgs: [routine['id']],
+    );
+  }
+
+  Future<int> deleteRoutine(int id) async {
+    final db = await instance.database;
+    // Also delete history
+    await db.delete('routine_history', where: 'routine_id = ?', whereArgs: [id]);
+    return await db.delete(
+      'routines',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- Routine History ---
+  Future<int> createRoutineHistory(Map<String, dynamic> history) async {
+    final db = await instance.database;
+    return await db.insert('routine_history', history);
+  }
+
+  Future<List<Map<String, dynamic>>> readRoutineHistory(int routineId) async {
+    final db = await instance.database;
+    return await db.query(
+      'routine_history',
+      where: 'routine_id = ?',
+      whereArgs: [routineId],
+      orderBy: 'date DESC',
+    );
+  }
+  
+  Future<Map<String, dynamic>?> getRoutineHistoryByDate(int routineId, String date) async {
+    final db = await instance.database;
+    final maps = await db.query(
+      'routine_history',
+      where: 'routine_id = ? AND date = ?',
+      whereArgs: [routineId, date],
+    );
+    if (maps.isNotEmpty) return maps.first;
+    return null;
+  }
+  
+  Future<int> updateRoutineHistory(Map<String, dynamic> history) async {
+    final db = await instance.database;
+    return db.update(
+      'routine_history',
+      history,
+      where: 'id = ?',
+      whereArgs: [history['id']],
     );
   }
 }

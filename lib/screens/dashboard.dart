@@ -7,6 +7,7 @@ import '../services/database_helper.dart';
 import '../services/alarm_service.dart';
 import '../theme/app_theme.dart';
 import 'add_task.dart';
+import 'routines_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -649,6 +650,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ),
                     ),
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.check_circle_outline, color: AppColors.primaryGlow),
+                        tooltip: 'Daily Routines',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RoutinesScreen()),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ),
 
                   // Content

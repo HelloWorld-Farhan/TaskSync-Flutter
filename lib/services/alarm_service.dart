@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import 'database_helper.dart';
 import 'email_service.dart';
+import 'notification_service.dart';
 
 @pragma('vm:entry-point')
 void alarmCallback(int id) async {
@@ -185,4 +186,82 @@ class AlarmService {
     await AndroidAlarmManager.cancel(99999);
     print('Stopped offline retry timer');
   }
+
+  // --- Routine Alarms ---
+  static Future<void> scheduleRoutineAlarm(Map<String, dynamic> routine) async {
+    int routineId = routine['id'];
+    String daysOfWeek = routine['days_of_week']; // "Mon,Tue,Wed"
+    
+    // We only schedule for the next valid day.
+    // Or just schedule a periodic daily alarm, and inside the callback, check if today is valid.
+    // Given the requirements, a daily alarm that checks daysOfWeek is simpler.
+    
+    DateTime now = DateTime.now();
+    // Parse times
+    final startParts = routine['start_time'].toString().split(':');
+    final endParts = routine['end_time'].toString().split(':');
+    
+    DateTime startTime = DateTime(now.year, now.month, now.day, int.parse(startParts[0]), int.parse(startParts[1]));
+    DateTime endTime = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+
+    if (startTime.isBefore(now)) startTime = startTime.add(const Duration(days: 1));
+    if (endTime.isBefore(now)) endTime = endTime.add(const Duration(days: 1));
+
+    int startId = routineId * 100 + 1;
+    int endId = routineId * 100 + 2;
+
+    await AndroidAlarmManager.periodic(
+      const Duration(days: 1),
+      startId,
+      routineAlarmCallback,
+      startAt: startTime,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
+    
+    await AndroidAlarmManager.periodic(
+      const Duration(days: 1),
+      endId,
+      routineAlarmCallback,
+      startAt: endTime,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: true,
+    );
+    print('Routine alarms scheduled for ID $routineId');
+  }
+  
+  static Future<void> cancelRoutineAlarm(int routineId) async {
+    await AndroidAlarmManager.cancel(routineId * 100 + 1);
+    await AndroidAlarmManager.cancel(routineId * 100 + 2);
+  }
 }
+
+@pragma('vm:entry-point')
+void routineAlarmCallback(int id) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  int routineId = id ~/ 100;
+  int type = id % 100; // 1 = start, 2 = end
+  
+  final routine = await DatabaseHelper.instance.getRoutine(routineId);
+  if (routine == null) return;
+
+  // Check if today is a valid day for this routine
+  List<String> days = routine['days_of_week'].toString().split(',');
+  List<String> weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  String todayStr = weekDays[DateTime.now().weekday - 1];
+  
+  if (!days.contains(todayStr)) {
+    print('Routine $routineId not scheduled for today ($todayStr). Skipping.');
+    return;
+  }
+
+  // Trigger Full Screen Notification
+  String title = routine['title'];
+  String body = type == 1 ? "Time to start your routine!" : "Routine time is over!";
+  String payload = "routine_${routineId}_${type}";
+  
+  await NotificationService.showFullScreenNotification(id, title, body, payload);
+}
+

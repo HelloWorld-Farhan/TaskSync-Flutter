@@ -5,11 +5,19 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'screens/dashboard.dart';
 import 'services/alarm_service.dart';
+import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
+
+import 'screens/routine_alarm_screen.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AndroidAlarmManager.initialize();
+  await NotificationService.initialize();
+  
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -19,21 +27,46 @@ void main() async {
 
   // Attempt to process any pending offline emails on startup
   retryCallback(0);
+  
+  // Check if launched by notification
+  final NotificationAppLaunchDetails? notificationAppLaunchDetails = 
+    await NotificationService.flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
 
-  runApp(const TaskSyncApp());
+  String? initialRoute;
+  if (notificationAppLaunchDetails?.didNotificationLaunchApp ?? false) {
+    if (notificationAppLaunchDetails?.notificationResponse?.payload != null) {
+      initialRoute = notificationAppLaunchDetails!.notificationResponse!.payload;
+    }
+  }
+
+  runApp(TaskSyncApp(initialRoutePayload: initialRoute));
 }
 
 class TaskSyncApp extends StatelessWidget {
-  const TaskSyncApp({super.key});
+  final String? initialRoutePayload;
+  const TaskSyncApp({super.key, this.initialRoutePayload});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'TaskSync',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const SplashScreen(),
+      home: _getInitialScreen(),
     );
+  }
+  
+  Widget _getInitialScreen() {
+    if (initialRoutePayload != null && initialRoutePayload!.startsWith('routine_')) {
+      final parts = initialRoutePayload!.split('_');
+      if (parts.length == 3) {
+        int routineId = int.tryParse(parts[1]) ?? 0;
+        int type = int.tryParse(parts[2]) ?? 0;
+        return RoutineAlarmScreen(routineId: routineId, alarmType: type);
+      }
+    }
+    return const SplashScreen();
   }
 }
 
