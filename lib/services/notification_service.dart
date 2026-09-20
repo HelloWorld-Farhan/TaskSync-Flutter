@@ -203,10 +203,14 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
           final routines = await DatabaseHelper.instance.readAllRoutines();
           try {
             final routine = routines.firstWhere((r) => r['id'] == routineId);
-            await DatabaseHelper.instance.insertRoutineHistory(
-              routineId, 
-              isDone ? 100 : 0
-            );
+            final nowStr = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+            await DatabaseHelper.instance.createRoutineHistory({
+              'routine_id': routineId,
+              'date': nowStr,
+              'completed_start': isDone ? 1 : 0,
+              'completed_end': isDone ? 1 : 0,
+              'score': isDone ? 100 : 0,
+            });
           } catch (e) {
             // routine not found
           }
@@ -217,11 +221,11 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
       if (parts.length >= 2) {
         int taskId = int.tryParse(parts[1]) ?? 0;
         if (taskId != 0) {
-          final task = await DatabaseHelper.instance.readTask(taskId);
-          final updatedTask = task.copy(
-            isCompleted: isDone ? 1 : 2
-          );
-          await DatabaseHelper.instance.update(updatedTask);
+          final task = await DatabaseHelper.instance.getTask(taskId);
+          if (task != null) {
+            task.isCompleted = isDone ? 1 : 2;
+            await DatabaseHelper.instance.update(task);
+          }
         }
       }
     }
