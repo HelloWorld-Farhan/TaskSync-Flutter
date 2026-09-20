@@ -18,7 +18,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   List<Task> _tasks = [];
   List<Map<String, dynamic>> _routines = [];
   bool _isLoading = true;
@@ -45,6 +45,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     _refreshTasks();
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) => _refreshTasks());
     Future.delayed(const Duration(milliseconds: 300), () => _fabController.forward());
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshTasks(); // Refresh when user opens the app again from notification click
+    }
   }
 
   void _initToday() {
@@ -55,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _fabController.dispose();
     _tabController.dispose();
     _refreshTimer?.cancel();
@@ -1160,6 +1169,7 @@ class _ScoreboardSheet extends StatelessWidget {
 
   Widget _breakdownRow(Map<String, dynamic> item) {
     final isDone = item['status'] == 'done';
+    final isPending = item['status'] == 'pending';
     final pts = item['points'] as int;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1170,8 +1180,8 @@ class _ScoreboardSheet extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Row(children: [
-        Icon(isDone ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            color: isDone ? AppColors.success : AppColors.danger, size: 20),
+        Icon(isDone ? Icons.check_circle_rounded : isPending ? Icons.pending_actions_rounded : Icons.cancel_rounded,
+            color: isDone ? AppColors.success : isPending ? AppColors.accent : AppColors.danger, size: 20),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(item['title'] as String,
@@ -1180,7 +1190,7 @@ class _ScoreboardSheet extends StatelessWidget {
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('$pts pts', style: TextStyle(
-              color: isDone ? AppColors.success : AppColors.textMuted,
+              color: isDone ? AppColors.success : isPending ? AppColors.accent : AppColors.textMuted,
               fontWeight: FontWeight.w700, fontSize: 14)),
           Text('/ ${item['max']} max', style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
         ]),

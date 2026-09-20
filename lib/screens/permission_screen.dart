@@ -11,13 +11,27 @@ class PermissionScreen extends StatefulWidget {
   State<PermissionScreen> createState() => _PermissionScreenState();
 }
 
-class _PermissionScreenState extends State<PermissionScreen> {
+class _PermissionScreenState extends State<PermissionScreen> with WidgetsBindingObserver {
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkExistingPermissions();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkExistingPermissions();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _checkExistingPermissions() async {
@@ -37,14 +51,18 @@ class _PermissionScreenState extends State<PermissionScreen> {
 
     if (Platform.isAndroid) {
       await Permission.notification.request();
-      await Permission.scheduleExactAlarm.request();
+      if (await Permission.scheduleExactAlarm.isDenied) {
+        await Permission.scheduleExactAlarm.request();
+      }
     }
 
-    if (!mounted) return;
+    // After requests, we check again. If it opened settings, 
+    // the didChangeAppLifecycleState will catch them when they return.
+    await _checkExistingPermissions();
     
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const DashboardScreen()),
-    );
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override

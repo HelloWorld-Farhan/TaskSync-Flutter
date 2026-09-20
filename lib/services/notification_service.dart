@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'database_helper.dart';
@@ -53,13 +54,14 @@ class NotificationService {
 
     // Create notification channels
     const AndroidNotificationChannel alarmChannel = AndroidNotificationChannel(
-      'routine_alarm_channel_2',
+      'routine_alarm_channel_3',
       'Routine Alarms',
       description: 'Full screen alarm notifications for routines',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
       enableLights: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
     );
 
     const AndroidNotificationChannel progressChannel = AndroidNotificationChannel(
@@ -84,7 +86,7 @@ class NotificationService {
   static Future<void> showFullScreenNotification(
       int id, String title, String body, String payload, {List<AndroidNotificationAction>? actions}) async {
     AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'routine_alarm_channel_2',
+      'routine_alarm_channel_3',
       'Routine Alarms',
       channelDescription: 'Full screen alarm notifications for routines',
       importance: Importance.max,
@@ -98,6 +100,7 @@ class NotificationService {
       autoCancel: false,
       showWhen: true,
       actions: actions,
+      additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT for continuous ringing
     );
 
     final NotificationDetails details = NotificationDetails(android: androidDetails);
