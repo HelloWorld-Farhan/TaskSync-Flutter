@@ -210,7 +210,7 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
                 endTimeObj = endTimeObj.add(const Duration(days: 1));
               }
               
-              await showRoutineProgressNotification(
+              await NotificationService.showRoutineProgressNotification(
                 id: routineId * 100 + 99,
                 routineTitle: routine['title'],
                 endTimeStr: routine['end_time'],

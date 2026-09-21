@@ -777,11 +777,13 @@ class _AddTaskScreenState extends State<AddTaskScreen>
     String? Function(String?)? validator,
     Widget? suffixIcon,
     int delay = 0,
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: controller,
       focusNode: focusNode,
       keyboardType: keyboardType,
+      readOnly: readOnly,
       maxLines: maxLines,
       inputFormatters: inputFormatters,
       validator: validator,

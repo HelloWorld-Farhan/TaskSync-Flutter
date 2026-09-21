@@ -115,9 +115,9 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
     NotificationService.showRoutineProgressNotification(
       id: widget.routineId * 100 + 99,
       routineTitle: r['title'],
-      endTime: r['end_time'],
+      endTimeStr: r['end_time'],
       payload: 'routine_${widget.routineId}_2',
-      minutesRemaining: _minutesRemaining,
+      endTimeObj: endTime,
     );
   }
 
