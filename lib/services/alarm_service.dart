@@ -277,18 +277,11 @@ void routineAlarmCallback(int id) async {
   String body = type == 1 ? "Time to start your routine!" : "Routine time is over!";
   String payload = "routine_${routineId}_$type";
   
-  List<AndroidNotificationAction> actions = [];
-  if (type == 1) {
-    actions = [
-      const AndroidNotificationAction('routine_doing', '🏃 Doing it', showsUserInterface: true, cancelNotification: true),
-      const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
-    ];
-  } else if (type == 2) {
-    actions = [
-      const AndroidNotificationAction('routine_end_done', '✅ Done', showsUserInterface: true, cancelNotification: true),
-      const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
-    ];
-  }
+  List<AndroidNotificationAction> actions = [
+    const AndroidNotificationAction('routine_doing', '🏃 Doing it', showsUserInterface: true, cancelNotification: true),
+    const AndroidNotificationAction('routine_end_done', '✅ Done', showsUserInterface: true, cancelNotification: true),
+    const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
+  ];
   
   await NotificationService.showFullScreenNotification(id, title, body, payload, actions: actions);
 }

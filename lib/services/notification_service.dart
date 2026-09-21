@@ -217,24 +217,18 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
                 payload: 'routine_${routineId}_2',
                 endTimeObj: endTimeObj,
               );
-            } else if (actionId == 'routine_start_done' || actionId == 'routine_cancel') {
-              int score = (actionId == 'routine_start_done') ? 100 : 0;
+            } else if (actionId == 'routine_cancel') {
               if (existingHistory == null) {
                 await DatabaseHelper.instance.createRoutineHistory({
                   'routine_id': routineId, 'date': nowStr,
-                  'completed_start': score > 0 ? 1 : 0, 'completed_end': score > 0 ? 1 : 0, 'score': score,
+                  'completed_start': 0, 'completed_end': 0, 'score': 0,
                 });
               } else {
-                existingHistory['score'] = score;
+                existingHistory['score'] = 0;
                 await DatabaseHelper.instance.updateRoutineHistory(existingHistory);
               }
-              // Cancel the end alarm
-              try {
-                // To avoid inline imports, we just call AlarmService.cancelRoutineAlarm(routineId);
-                // But wait, AlarmService is not imported here.
-                // Let's just update the routine_history, and the alarm can fire but we ignore it if it's already done.
-                // Oh wait, in routineAlarmCallback, if score > 0, it won't fire the end alarm!
-              } catch (e) {}
+              // Cancel progress notification just in case
+              try { await NotificationService.cancelNotification(routineId * 100 + 99); } catch (_) {}
             } else if (actionId == 'routine_end_done') {
               int score = 0;
               // Check time difference
@@ -259,6 +253,9 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
                 existingHistory['score'] = score;
                 await DatabaseHelper.instance.updateRoutineHistory(existingHistory);
               }
+              
+              // Cancel progress notification since we are done
+              try { await NotificationService.cancelNotification(routineId * 100 + 99); } catch (_) {}
             }
           } catch (e) {
             print("Background error: \$e");

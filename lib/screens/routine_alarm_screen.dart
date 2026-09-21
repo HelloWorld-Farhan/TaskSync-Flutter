@@ -36,7 +36,7 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
   bool _responded = false;
 
   // Countdown for alarm auto-stop
-  int _alarmSecondsLeft = 10;
+  int _alarmSecondsLeft = 15;
 
   // For end-alarm deduction tracking
   DateTime? _endAlarmFiredAt;
@@ -87,11 +87,6 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
         }
       }
     });
-
-    // For START alarm — show progress timer notification
-    if (widget.alarmType == 1 && data != null) {
-      _startProgressNotification(data);
-    }
 
     // For END alarm — record when it fired
     if (widget.alarmType == 2) {
@@ -215,8 +210,8 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
   void _dismissStartAlarm() {
     _stopRingtone();
     _ringTimer?.cancel();
-    // For start alarm, just dismiss without scoring — routine timer notification stays
     if (mounted) Navigator.pop(context);
+    SystemNavigator.pop();
   }
 
   void _showResult(bool isDone, int points) {
@@ -254,7 +249,8 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Close alarm screen
+                if (mounted) Navigator.pop(context); // Close alarm screen
+                SystemNavigator.pop(); // Close app completely
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDone ? AppColors.success : AppColors.primary,
