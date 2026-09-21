@@ -262,10 +262,34 @@ void routineAlarmCallback(int id) async {
   
   if (!days.contains(todayStr)) return;
 
+  if (type == 2) {
+    final now = DateTime.now();
+    final nowStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final history = await DatabaseHelper.instance.getRoutineHistoryByDate(routineId, nowStr);
+    
+    // If it's already completed or cancelled (score >= 0), don't fire end alarm
+    if (history != null && (history['score'] as int) >= 0) {
+      return;
+    }
+  }
+
   String title = routine['title'];
   String body = type == 1 ? "Time to start your routine!" : "Routine time is over!";
   String payload = "routine_${routineId}_$type";
   
-  await NotificationService.showFullScreenNotification(id, title, body, payload);
+  List<AndroidNotificationAction> actions = [];
+  if (type == 1) {
+    actions = [
+      const AndroidNotificationAction('routine_doing', '🏃 Doing it', showsUserInterface: true, cancelNotification: true),
+      const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
+    ];
+  } else if (type == 2) {
+    actions = [
+      const AndroidNotificationAction('routine_end_done', '✅ Done', showsUserInterface: true, cancelNotification: true),
+      const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
+    ];
+  }
+  
+  await NotificationService.showFullScreenNotification(id, title, body, payload, actions: actions);
 }
 

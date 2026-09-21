@@ -476,6 +476,7 @@ class _AddTaskScreenState extends State<AddTaskScreen>
                             icon: Icons.calendar_month_rounded,
                             keyboardType: TextInputType.number,
                             inputFormatters: [_dateFormatter],
+                            readOnly: true,
                             delay: 300,
                             suffixIcon: Padding(
                               padding: const EdgeInsets.only(right: 8.0, top: 8.0, bottom: 8.0),

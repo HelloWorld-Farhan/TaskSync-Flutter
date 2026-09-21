@@ -54,14 +54,14 @@ class NotificationService {
 
     // Create notification channels
     const AndroidNotificationChannel alarmChannel = AndroidNotificationChannel(
-      'routine_alarm_channel_3',
+      'routine_alarm_channel_4',
       'Routine Alarms',
       description: 'Full screen alarm notifications for routines',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
       enableLights: true,
-      audioAttributesUsage: AudioAttributesUsage.alarm,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
     );
 
     const AndroidNotificationChannel progressChannel = AndroidNotificationChannel(
@@ -86,7 +86,7 @@ class NotificationService {
   static Future<void> showFullScreenNotification(
       int id, String title, String body, String payload, {List<AndroidNotificationAction>? actions}) async {
     AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'routine_alarm_channel_3',
+      'routine_alarm_channel_4',
       'Routine Alarms',
       channelDescription: 'Full screen alarm notifications for routines',
       importance: Importance.max,
@@ -119,16 +119,16 @@ class NotificationService {
   static Future<void> showRoutineProgressNotification({
     required int id,
     required String routineTitle,
-    required String endTime,
+    required String endTimeStr,
     required String payload,
-    required int minutesRemaining,
+    required DateTime endTimeObj,
   }) async {
     final List<AndroidNotificationAction> actions = [
       const AndroidNotificationAction(
-        'done_action',
+        'routine_end_done',
         '✅ Mark Done',
         showsUserInterface: true,
-        cancelNotification: false,
+        cancelNotification: true,
       ),
     ];
 
@@ -148,7 +148,7 @@ class NotificationService {
       subText: 'Routine in Progress',
       usesChronometer: true,
       chronometerCountDown: true,
-      when: DateTime.now().add(Duration(minutes: minutesRemaining)).millisecondsSinceEpoch,
+      when: endTimeObj.millisecondsSinceEpoch,
     );
 
     final NotificationDetails details = NotificationDetails(android: androidDetails);
@@ -156,7 +156,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.show(
       id: id,
       title: '⏱ $routineTitle',
-      body: 'Ends at $endTime · Complete it to earn 100 pts',
+      body: 'Ends at $endTimeStr · Complete it to earn 100 pts',
       notificationDetails: details,
       payload: payload,
     );
@@ -202,6 +202,21 @@ void notificationTapBackground(NotificationResponse notificationResponse) async 
                   'completed_start': 1, 'completed_end': 0, 'score': -1,
                 });
               }
+              
+              // Transition alarm into a progress timer
+              final endParts = routine['end_time'].toString().split(':');
+              DateTime endTimeObj = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+              if (endTimeObj.isBefore(now.subtract(const Duration(hours: 12)))) {
+                endTimeObj = endTimeObj.add(const Duration(days: 1));
+              }
+              
+              await showRoutineProgressNotification(
+                id: routineId * 100 + 99,
+                routineTitle: routine['title'],
+                endTimeStr: routine['end_time'],
+                payload: 'routine_${routineId}_2',
+                endTimeObj: endTimeObj,
+              );
             } else if (actionId == 'routine_start_done' || actionId == 'routine_cancel') {
               int score = (actionId == 'routine_start_done') ? 100 : 0;
               if (existingHistory == null) {
