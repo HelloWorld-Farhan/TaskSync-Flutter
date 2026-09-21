@@ -223,6 +223,7 @@ class AlarmService {
       startId,
       routineAlarmCallback,
       startAt: startTime,
+      allowWhileIdle: true,
       exact: true,
       wakeup: true,
       rescheduleOnReboot: true,
@@ -233,6 +234,7 @@ class AlarmService {
       endId,
       routineAlarmCallback,
       startAt: endTime,
+      allowWhileIdle: true,
       exact: true,
       wakeup: true,
       rescheduleOnReboot: true,
@@ -283,6 +285,23 @@ void routineAlarmCallback(int id) async {
     const AndroidNotificationAction('routine_cancel', '❌ Cancel', showsUserInterface: true, cancelNotification: true),
   ];
   
-  await NotificationService.showFullScreenNotification(id, title, body, payload, actions: actions);
+  DateTime? endTimeObj;
+  if (type == 1) {
+    final now = DateTime.now();
+    final endParts = routine['end_time'].toString().split(':');
+    endTimeObj = DateTime(now.year, now.month, now.day, int.parse(endParts[0]), int.parse(endParts[1]));
+    if (endTimeObj.isBefore(now)) {
+      endTimeObj = endTimeObj.add(const Duration(days: 1));
+    }
+  }
+
+  await NotificationService.showFullScreenNotification(
+    id, 
+    title, 
+    body, 
+    payload, 
+    actions: actions,
+    endTimeObj: endTimeObj,
+  );
 }
 

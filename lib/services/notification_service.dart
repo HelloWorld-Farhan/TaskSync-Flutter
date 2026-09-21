@@ -84,7 +84,7 @@ class NotificationService {
 
   /// Full-screen alarm notification (shown on lock screen too)
   static Future<void> showFullScreenNotification(
-      int id, String title, String body, String payload, {List<AndroidNotificationAction>? actions}) async {
+      int id, String title, String body, String payload, {List<AndroidNotificationAction>? actions, DateTime? endTimeObj}) async {
     AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'routine_alarm_channel_4',
       'Routine Alarms',
@@ -100,6 +100,9 @@ class NotificationService {
       autoCancel: false,
       showWhen: true,
       actions: actions,
+      usesChronometer: endTimeObj != null,
+      chronometerCountDown: endTimeObj != null,
+      when: endTimeObj?.millisecondsSinceEpoch,
       additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT for continuous ringing
     );
 

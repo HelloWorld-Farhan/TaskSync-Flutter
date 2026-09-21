@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
+import 'dashboard.dart';
 
 class RoutineAlarmScreen extends StatefulWidget {
   final int routineId;
@@ -71,8 +72,8 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
       return;
     }
 
-    // Play alarm sound
-    FlutterRingtonePlayer().playAlarm();
+    // Play calling ringtone
+    FlutterRingtonePlayer().playRingtone();
 
     // Countdown to auto-stop alarm after 10 seconds
     _ringTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -222,22 +223,27 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
         backgroundColor: AppColors.bgCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDone ? AppColors.success.withValues(alpha: 0.1) : AppColors.danger.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(isDone ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                color: isDone ? AppColors.success : AppColors.danger, size: 56),
-          ),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDone ? AppColors.success.withValues(alpha: 0.1) : AppColors.danger.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(isDone ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  color: isDone ? AppColors.success : AppColors.danger, size: 56),
+            ).animate()
+             .scale(duration: 400.ms, curve: Curves.easeOutBack)
+             .moveY(begin: 30, end: 0, duration: 400.ms),
           const SizedBox(height: 16),
           Text(isDone ? 'Great Work!' : 'Routine Missed',
               style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 20)),
           const SizedBox(height: 8),
           Text(isDone ? '+$points points earned' : '0 points — Better luck next time!',
               style: TextStyle(color: isDone ? AppColors.success : AppColors.danger,
-                  fontWeight: FontWeight.w600, fontSize: 15)),
+                  fontWeight: FontWeight.w600, fontSize: 15))
+            .animate(delay: 200.ms)
+            .fadeIn(duration: 300.ms)
+            .moveY(begin: 10, end: 0, duration: 300.ms),
           if (isDone && _minutesLate > 0) ...[
             const SizedBox(height: 4),
             Text('(${_minutesLate} min late: -${(_minutesLate * 0.01).toStringAsFixed(2)} pts)',
@@ -249,8 +255,10 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                if (mounted) Navigator.pop(context); // Close alarm screen
-                SystemNavigator.pop(); // Close app completely
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const Dashboard()),
+                  (route) => false,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDone ? AppColors.success : AppColors.primary,
