@@ -256,7 +256,7 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen>
               onPressed: () {
                 Navigator.pop(context); // Close dialog
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => Dashboard()),
+                  MaterialPageRoute(builder: (_) => const DashboardScreen()),
                   (route) => false,
                 );
               },
