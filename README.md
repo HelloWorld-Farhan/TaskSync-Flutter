@@ -1,73 +1,29 @@
-# 🛒 Cartly — Modern E-Commerce Platform
+# ⏰ TaskSync - The Smart Schedule Reminder <p align="center"> <img src="Logo.png" width="250" alt="TaskSync Logo" /> </p> <p align="center"> <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white"/> <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white"/> <img src="https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white"/> <img src="https://img.shields.io/badge/Google_Apps_Script-4285F4?style=for-the-badge&logo=google&logoColor=white"/> <img src="https://img.shields.io/badge/License-MIT-brightgreen?style=for-the-badge"/> </p> <p align="center"> <strong>TaskSync</strong> is a beautiful, highly polished schedule reminder app built in Flutter. It features smart time & date parsing, seamless local storage to persist your daily tasks permanently, and custom email integrations using Google Apps Script to remind you exactly when you need it. </p> --- ## ✨ Features | Feature | Description | |---|---| | 🎨 **Perfect UI & Animations** | Glassmorphic design, smooth splash screens, and engaging custom checklist interactions. | | 🧠 **Smart Input Formatting** | Type 3 and it instantly formats to 03:00. Dates format automatically as you type (MM/DD/YYYY or -). | | 💾 **Persistent Local Storage** | Uses SQLite to save all your tasks securely on your device until you uninstall the app. | | 📧 **Custom Email Reminders** | Integrates with Google Apps Script to trigger precise email notifications at your chosen time. | | 🔔 **Morning Briefings** | Local push notifications to wake you up with your full day's agenda. | | 🌙 **Light & Dark Mode** | A sleek, borderless UI that looks phenomenal in any theme. | --- ## 📥 How to Download & Run (For Users) 1. Go to the [Releases](https://github.com/HelloWorld-Farhan/TaskSync-Flutter/releases) section of this repository. 2. Download the latest **app-release.apk** file. 3. Install it on your Android device. 4. Open **TaskSync**, add your daily schedule, and let it handle your reminders! --- ## 💻 How to Build (For Developers) Before you begin, ensure you have the **Flutter SDK** installed on your system. ### Step 1 — Clone the Repository
+bash
+git clone https://github.com/HelloWorld-Farhan/TaskSync-Flutter.git
+cd TaskSync-Flutter
+### Step 2 — Fetch Dependencies
+bash
+flutter pub get
+### Step 3 — Run Locally
+bash
+flutter run
+### Step 4 — Build the APK Release
+bash
+flutter build apk --release
+*Your app-release.apk file will be generated inside build/app/outputs/flutter-apk/.* --- ## 👨‍💻 Author **Farhan Khalid** 📧 farhankhalid17968@gmail.com 🔗 [LinkedIn](https://www.linkedin.com/in/farhan-khalid-117514259/) 🐙 [GitHub](https://github.com/HelloWorld-Farhan) --- ## 📄 License
+text
+MIT License
 
-<p align="center">
-  <strong>A modern, responsive and scalable e-commerce platform built for a smooth online shopping experience.</strong>
-</p>
+Copyright (c) 2026 Farhan Khalid
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React-2026-61DAFB?style=for-the-badge&logo=react&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Vite-7.x-646CFF?style=for-the-badge&logo=vite&logoColor=white"/>
-  <img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Node.js-Backend-339933?style=for-the-badge&logo=node.js&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white"/>
-  <img src="https://img.shields.io/badge/MongoDB-Database-47A248?style=for-the-badge&logo=mongodb&logoColor=white"/>
-  <img src="https://img.shields.io/badge/TypeScript-Supported-3178C6?style=for-the-badge&logo=typescript&logoColor=white"/>
-</p>
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished
+to do so, subject to the following conditions:
 
----
-
-## 📖 About Cartly
-
-**Cartly** is a modern full-stack e-commerce platform designed to provide users with a clean, responsive and intuitive online shopping experience.
-
-The platform combines a fast React-based frontend with a scalable backend architecture, database management and API-driven services.
-
-Cartly is designed around a simple goal:
-
-> **Make online shopping fast, simple and enjoyable.**
-
-The project includes product browsing, product details, shopping cart functionality, user interactions and a structured backend architecture for managing application data.
-
----
-
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 🛍️ **Product Browsing** | Browse and explore products through a clean and responsive interface. |
-| 🔎 **Product Discovery** | Search and discover products easily. |
-| 📦 **Product Details** | View detailed information about individual products. |
-| 🛒 **Shopping Cart** | Add, remove and manage products in the shopping cart. |
-| 📱 **Responsive Design** | Optimized for desktop, tablet and mobile devices. |
-| ⚡ **Fast Performance** | Built with Vite for a fast development and production experience. |
-| 🔗 **API Integration** | Communicates with the backend through REST APIs. |
-| 🔐 **Authentication Ready** | Architecture prepared for secure user authentication and authorization. |
-| 💾 **Database Integration** | Backend data is managed using Prisma and MongoDB. |
-| 🧩 **Modular Architecture** | Components and features are organized for maintainability and scalability. |
-| 🎨 **Modern UI** | Clean and modern interface designed for an e-commerce experience. |
-
----
-
-# 🏗️ Project Architecture
-
-Cartly is structured as a full-stack application:
-
-```text
-                    ┌──────────────────────┐
-                    │       Cartly UI      │
-                    │    React + Vite      │
-                    └──────────┬───────────┘
-                               │
-                               │ REST API
-                               ▼
-                    ┌──────────────────────┐
-                    │    Cartly Backend    │
-                    │ Node.js / API Layer  │
-                    └──────────┬───────────┘
-                               │
-                               │ Prisma ORM
-                               ▼
-                    ┌──────────────────────┐
-                    │      MongoDB         │
-                    │      Database        │
-                    └──────────────────────┘
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+--- ## 🌟 Support If you found this app helpful for managing your schedule, please consider giving it a ⭐ on GitHub! <p align="center">Made with ❤️ in India</p>
